@@ -53,8 +53,12 @@ export const assembleNotebook = (
     description,
     k8sName: { value: notebookId },
   } = notebookData;
-  const imageUrl = `${image.imageStream?.status?.dockerImageRepository}:${image.imageVersion?.name}`;
-  const imageSelection = `${image.imageStream?.metadata.name}:${image.imageVersion?.name}`;
+  const imageUrl = `${image.imageStream?.status?.dockerImageRepository ?? ''}:${
+    image.imageVersion?.name ?? ''
+  }`;
+  const imageSelection = `${image.imageStream?.metadata.name ?? ''}:${
+    image.imageVersion?.name ?? ''
+  }`;
 
   const { affinity, tolerations, resources } = assemblePodSpecOptions(
     notebookSize.resources,
@@ -256,22 +260,31 @@ export const createNotebook = (
   data: StartNotebookData,
   username: string,
   canEnablePipelines?: boolean,
-): Promise<NotebookKind> => {
-  const notebook = assembleNotebook(data, username, canEnablePipelines);
+  opts?: K8sAPIOptions,
+): Promise<NotebookKind> =>
+  new Promise((resolve, reject) => {
+    const notebook = assembleNotebook(data, username, canEnablePipelines);
 
-  const notebookPromise = k8sCreateResource<NotebookKind>({
-    model: NotebookModel,
-    resource: notebook,
+    k8sCreateResource<NotebookKind>(
+      applyK8sAPIOptions(
+        {
+          model: NotebookModel,
+          resource: notebook,
+        },
+        opts,
+      ),
+    )
+      .then((fetchedNotebook) => {
+        if (canEnablePipelines) {
+          createElyraServiceAccountRoleBinding(fetchedNotebook, opts)
+            .then(() => resolve(fetchedNotebook))
+            .catch(reject);
+        } else {
+          resolve(fetchedNotebook);
+        }
+      })
+      .catch(reject);
   });
-
-  if (canEnablePipelines) {
-    return notebookPromise.then((fetchedNotebook) =>
-      createElyraServiceAccountRoleBinding(fetchedNotebook).then(() => fetchedNotebook),
-    );
-  }
-
-  return notebookPromise;
-};
 
 export const updateNotebook = (
   existingNotebook: NotebookKind,
@@ -396,7 +409,7 @@ export const attachNotebookPVC = (
   notebookName: string,
   namespace: string,
   pvcName: string,
-  mountSuffix: string,
+  mountPath: string,
   opts?: K8sAPIOptions,
 ): Promise<NotebookKind> => {
   const patches: Patch[] = [
@@ -409,7 +422,7 @@ export const attachNotebookPVC = (
       op: 'add',
       // TODO: can we assume first container?
       path: '/spec/template/spec/containers/0/volumeMounts/-',
-      value: { mountPath: `${ROOT_MOUNT_PATH}/${mountSuffix}`, name: pvcName },
+      value: { mountPath, name: pvcName },
     },
   ];
 
@@ -424,6 +437,56 @@ export const attachNotebookPVC = (
     ),
   );
 };
+
+export const updateNotebookPVC = (
+  notebookName: string,
+  namespace: string,
+  mountPath: string,
+  pvcName: string,
+  opts?: K8sAPIOptions,
+): Promise<NotebookKind> =>
+  new Promise((resolve, reject) => {
+    getNotebook(notebookName, namespace)
+      .then((notebook) => {
+        const volumes = notebook.spec.template.spec.volumes || [];
+        const volumeMounts = notebook.spec.template.spec.containers[0].volumeMounts || [];
+
+        const filteredVolumeMounts = volumeMounts.map((volumeMount) => {
+          if (volumeMount.name === pvcName) {
+            return { ...volumeMount, mountPath };
+          }
+          return volumeMount;
+        });
+
+        const patches: Patch[] = [
+          {
+            op: 'replace',
+            path: '/spec/template/spec/volumes',
+            value: volumes,
+          },
+          {
+            op: 'replace',
+            // TODO: can we assume first container?
+            path: '/spec/template/spec/containers/0/volumeMounts',
+            value: filteredVolumeMounts,
+          },
+        ];
+
+        k8sPatchResource<NotebookKind>(
+          applyK8sAPIOptions(
+            {
+              model: NotebookModel,
+              queryOptions: { name: notebookName, ns: namespace },
+              patches,
+            },
+            opts,
+          ),
+        )
+          .then(resolve)
+          .catch(reject);
+      })
+      .catch(reject);
+  });
 
 export const removeNotebookPVC = (
   notebookName: string,

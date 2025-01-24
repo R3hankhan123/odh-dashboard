@@ -4,11 +4,11 @@ import {
   Checkbox,
   Grid,
   GridItem,
-  Modal,
   Split,
   SplitItem,
   Tooltip,
 } from '@patternfly/react-core';
+import { Modal } from '@patternfly/react-core/deprecated';
 import { CloseIcon } from '@patternfly/react-icons';
 import * as React from 'react';
 import { allFeatureFlags } from '~/concepts/areas/const';
@@ -62,7 +62,7 @@ const DevFeatureFlagsBanner: React.FC<Props> = ({
   );
   return (
     <>
-      <Banner variant="blue">
+      <Banner color="blue">
         <Split>
           <SplitItem isFilled>
             Feature flags are{' '}
@@ -102,28 +102,30 @@ const DevFeatureFlagsBanner: React.FC<Props> = ({
           </SplitItem>
         </Split>
       </Banner>
-      <Modal
-        data-testid="dev-feature-flags-modal"
-        variant="large"
-        title="Feature flags"
-        isOpen={isModalOpen}
-        onClose={() => {
-          setModalOpen(false);
-          setDevFeatureFlagQueryVisible(false);
-        }}
-        actions={[
-          <Button
-            data-testid="reset-feature-flags-modal-button"
-            key="confirm"
-            variant="link"
-            onClick={() => resetDevFeatureFlags()}
-          >
-            Reset to defaults
-          </Button>,
-        ]}
-      >
-        {renderDevFeatureFlags()}
-      </Modal>
+      {isModalOpen ? (
+        <Modal
+          data-testid="dev-feature-flags-modal"
+          variant="large"
+          title="Feature flags"
+          isOpen
+          onClose={() => {
+            setModalOpen(false);
+            setDevFeatureFlagQueryVisible(false);
+          }}
+          actions={[
+            <Button
+              data-testid="reset-feature-flags-modal-button"
+              key="confirm"
+              variant="link"
+              onClick={() => resetDevFeatureFlags()}
+            >
+              Reset to defaults
+            </Button>,
+          ]}
+        >
+          {renderDevFeatureFlags()}
+        </Modal>
+      ) : null}
     </>
   );
 };

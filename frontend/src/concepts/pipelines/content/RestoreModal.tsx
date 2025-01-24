@@ -1,5 +1,6 @@
 import React from 'react';
-import { Button, Modal } from '@patternfly/react-core';
+import { Button } from '@patternfly/react-core';
+import { Modal } from '@patternfly/react-core/deprecated';
 import { usePipelinesAPI } from '~/concepts/pipelines/context';
 import DashboardModalFooter from '~/concepts/dashboard/DashboardModalFooter';
 
@@ -9,7 +10,6 @@ interface RestoreModalProps {
   title: string;
   alertTitle: string;
   children: React.ReactNode;
-  isOpen: boolean;
   testId: string;
 }
 
@@ -18,7 +18,6 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({
   onSubmit,
   title,
   children,
-  isOpen,
   testId,
   alertTitle,
 }) => {
@@ -43,7 +42,7 @@ export const RestoreModal: React.FC<RestoreModalProps> = ({
 
   return (
     <Modal
-      isOpen={isOpen}
+      isOpen
       title={title}
       variant="small"
       onClose={onCancel}

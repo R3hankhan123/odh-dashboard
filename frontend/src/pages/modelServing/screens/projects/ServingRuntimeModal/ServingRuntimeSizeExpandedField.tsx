@@ -1,28 +1,22 @@
 import * as React from 'react';
 import { FormGroup, Grid } from '@patternfly/react-core';
-import IndentSection from '~/pages/projects/components/IndentSection';
 import { UpdateObjectAtPropAndValue } from '~/pages/projects/types';
-import {
-  CreatingInferenceServiceObject,
-  CreatingServingRuntimeObject,
-} from '~/pages/modelServing/screens/types';
+import { CreatingModelServingObjectCommon } from '~/pages/modelServing/screens/types';
 import { ContainerResourceAttributes, ContainerResources } from '~/types';
 import CPUField from '~/components/CPUField';
 import MemoryField from '~/components/MemoryField';
 
-type ServingRuntimeSizeExpandedFieldProps = {
-  data: CreatingServingRuntimeObject | CreatingInferenceServiceObject;
-  setData:
-    | UpdateObjectAtPropAndValue<CreatingServingRuntimeObject>
-    | UpdateObjectAtPropAndValue<CreatingInferenceServiceObject>;
+type ServingRuntimeSizeExpandedFieldProps<D extends CreatingModelServingObjectCommon> = {
+  data: D;
+  setData: UpdateObjectAtPropAndValue<D>;
 };
 
 type ResourceKeys = keyof ContainerResources;
 
-const ServingRuntimeSizeExpandedField: React.FC<ServingRuntimeSizeExpandedFieldProps> = ({
+const ServingRuntimeSizeExpandedField = <D extends CreatingModelServingObjectCommon>({
   data,
   setData,
-}) => {
+}: ServingRuntimeSizeExpandedFieldProps<D>): React.ReactNode => {
   const handleChange = (
     type: ContainerResourceAttributes.CPU | ContainerResourceAttributes.MEMORY,
     variant: ResourceKeys,
@@ -41,36 +35,32 @@ const ServingRuntimeSizeExpandedField: React.FC<ServingRuntimeSizeExpandedFieldP
   };
 
   return (
-    <IndentSection>
-      <Grid hasGutter md={6}>
-        <FormGroup label="CPUs requested">
-          <CPUField
-            onChange={(value) => handleChange(ContainerResourceAttributes.CPU, 'requests', value)}
-            value={data.modelSize.resources.requests?.cpu}
-          />
-        </FormGroup>
-        <FormGroup label="Memory requested">
-          <MemoryField
-            onChange={(value) =>
-              handleChange(ContainerResourceAttributes.MEMORY, 'requests', value)
-            }
-            value={data.modelSize.resources.requests?.memory}
-          />
-        </FormGroup>
-        <FormGroup label="CPU limit">
-          <CPUField
-            onChange={(value) => handleChange(ContainerResourceAttributes.CPU, 'limits', value)}
-            value={data.modelSize.resources.limits?.cpu}
-          />
-        </FormGroup>
-        <FormGroup label="Memory limit">
-          <MemoryField
-            onChange={(value) => handleChange(ContainerResourceAttributes.MEMORY, 'limits', value)}
-            value={data.modelSize.resources.limits?.memory}
-          />
-        </FormGroup>
-      </Grid>
-    </IndentSection>
+    <Grid hasGutter md={6}>
+      <FormGroup label="CPUs requested">
+        <CPUField
+          onChange={(value) => handleChange(ContainerResourceAttributes.CPU, 'requests', value)}
+          value={data.modelSize.resources.requests?.cpu}
+        />
+      </FormGroup>
+      <FormGroup label="Memory requested">
+        <MemoryField
+          onChange={(value) => handleChange(ContainerResourceAttributes.MEMORY, 'requests', value)}
+          value={data.modelSize.resources.requests?.memory}
+        />
+      </FormGroup>
+      <FormGroup label="CPU limit">
+        <CPUField
+          onChange={(value) => handleChange(ContainerResourceAttributes.CPU, 'limits', value)}
+          value={data.modelSize.resources.limits?.cpu}
+        />
+      </FormGroup>
+      <FormGroup label="Memory limit">
+        <MemoryField
+          onChange={(value) => handleChange(ContainerResourceAttributes.MEMORY, 'limits', value)}
+          value={data.modelSize.resources.limits?.memory}
+        />
+      </FormGroup>
+    </Grid>
   );
 };
 

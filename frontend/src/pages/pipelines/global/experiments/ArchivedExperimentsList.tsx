@@ -1,35 +1,18 @@
 import * as React from 'react';
-import {
-  Bullseye,
-  EmptyState,
-  EmptyStateBody,
-  EmptyStateHeader,
-  EmptyStateIcon,
-  Spinner,
-} from '@patternfly/react-core';
-import { CubesIcon, ExclamationCircleIcon } from '@patternfly/react-icons';
+import { Bullseye, EmptyState, EmptyStateBody, Spinner } from '@patternfly/react-core';
+import { CubesIcon } from '@patternfly/react-icons';
 import createUsePipelineTable from '~/concepts/pipelines/content/tables/usePipelineTable';
 import { useArchivedExperiments } from '~/concepts/pipelines/apiHooks/useExperiments';
 import ArchivedExperimentTable from '~/concepts/pipelines/content/tables/experiment/ArchivedExperimentTable';
 import { ExperimentListTabTitle } from '~/pages/pipelines/global/experiments/const';
+import ExperimentLoadingError from '~/concepts/pipelines/content/experiments/ExperimentLoadingError';
 
 const ArchivedExperimentsList: React.FC = () => {
   const [[{ items: experiments, totalSize }, loaded, error], { initialLoaded, ...tableProps }] =
     createUsePipelineTable(useArchivedExperiments)();
 
   if (error) {
-    return (
-      <Bullseye>
-        <EmptyState>
-          <EmptyStateHeader
-            titleText="There was an issue loading experiments"
-            icon={<EmptyStateIcon icon={ExclamationCircleIcon} />}
-            headingLevel="h2"
-          />
-          <EmptyStateBody>{error.message}</EmptyStateBody>
-        </EmptyState>
-      </Bullseye>
-    );
+    return <ExperimentLoadingError error={error} />;
   }
 
   if (!loaded && !initialLoaded) {
@@ -42,12 +25,12 @@ const ArchivedExperimentsList: React.FC = () => {
 
   if (loaded && totalSize === 0 && !tableProps.filter) {
     return (
-      <EmptyState data-testid="global-no-experiments">
-        <EmptyStateHeader
-          titleText="No archived experiments"
-          icon={<EmptyStateIcon icon={CubesIcon} />}
-          headingLevel="h4"
-        />
+      <EmptyState
+        headingLevel="h4"
+        icon={CubesIcon}
+        titleText="No archived experiments"
+        data-testid="global-no-experiments"
+      >
         <EmptyStateBody>
           When you are finished with an experiment, you can archive it in the{' '}
           {ExperimentListTabTitle.ACTIVE} tab. You can view the archived experiment here.

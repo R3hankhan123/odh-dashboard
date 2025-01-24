@@ -5,8 +5,6 @@ import {
   EmptyStateActions,
   EmptyStateBody,
   EmptyStateFooter,
-  EmptyStateHeader,
-  EmptyStateIcon,
   EmptyStateVariant,
 } from '@patternfly/react-core';
 import { PlusCircleIcon } from '@patternfly/react-icons';
@@ -15,13 +13,19 @@ import useModelRegistriesBackend from '~/concepts/modelRegistrySettings/useModel
 import TitleWithIcon from '~/concepts/design/TitleWithIcon';
 import { ProjectObjectType } from '~/concepts/design/utils';
 import { ModelRegistrySelectorContext } from '~/concepts/modelRegistry/context/ModelRegistrySelectorContext';
+import { useContextResourceData } from '~/utilities/useContextResourceData';
+import { RoleBindingKind } from '~/k8sTypes';
 import ModelRegistriesTable from './ModelRegistriesTable';
 import CreateModal from './CreateModal';
+import useModelRegistryRoleBindings from './useModelRegistryRoleBindings';
 
 const ModelRegistrySettings: React.FC = () => {
   const [createModalOpen, setCreateModalOpen] = React.useState(false);
-  const [modelRegistries, loaded, loadError, refreshModelRegistries] = useModelRegistriesBackend();
+  const [modelRegistries, mrloaded, loadError, refreshModelRegistries] =
+    useModelRegistriesBackend();
+  const roleBindings = useContextResourceData<RoleBindingKind>(useModelRegistryRoleBindings());
   const { refreshRulesReview } = React.useContext(ModelRegistrySelectorContext);
+  const loaded = mrloaded && roleBindings.loaded;
 
   const refreshAll = React.useCallback(
     () => Promise.all([refreshModelRegistries(), refreshRulesReview()]),
@@ -34,7 +38,7 @@ const ModelRegistrySettings: React.FC = () => {
         title={
           <TitleWithIcon
             title="Model Registry Settings"
-            objectType={ProjectObjectType.registeredModels}
+            objectType={ProjectObjectType.modelRegistrySettings}
           />
         }
         description="Manage model registry settings for all users in your organization."
@@ -43,12 +47,13 @@ const ModelRegistrySettings: React.FC = () => {
         errorMessage="Unable to load model registries."
         empty={modelRegistries.length === 0}
         emptyStatePage={
-          <EmptyState variant={EmptyStateVariant.lg} data-testid="mr-settings-empty-state">
-            <EmptyStateHeader
-              titleText="No model registries"
-              icon={<EmptyStateIcon icon={PlusCircleIcon} />}
-              headingLevel="h5"
-            />
+          <EmptyState
+            headingLevel="h5"
+            icon={PlusCircleIcon}
+            titleText="No model registries"
+            variant={EmptyStateVariant.lg}
+            data-testid="mr-settings-empty-state"
+          >
             <EmptyStateBody>
               To get started, create a model registry. You can manage permissions after creation.
             </EmptyStateBody>
@@ -65,17 +70,16 @@ const ModelRegistrySettings: React.FC = () => {
       >
         <ModelRegistriesTable
           modelRegistries={modelRegistries}
+          roleBindings={roleBindings}
           refresh={refreshAll}
           onCreateModelRegistryClick={() => {
             setCreateModalOpen(true);
           }}
         />
       </ApplicationsPage>
-      <CreateModal
-        isOpen={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
-        refresh={refreshAll}
-      />
+      {createModalOpen ? (
+        <CreateModal onClose={() => setCreateModalOpen(false)} refresh={refreshAll} />
+      ) : null}
     </>
   );
 };

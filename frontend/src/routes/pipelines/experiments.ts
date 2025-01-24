@@ -1,3 +1,5 @@
+import { CompareRunsSearchParam } from '~/concepts/pipelines/content/types';
+
 export const experimentsRootPath = '/experiments';
 export const globExperimentsAll = `${experimentsRootPath}/*`;
 
@@ -19,17 +21,17 @@ export const experimentsCreateRecurringRunRoute = (
   experimentId: string,
 ): string => `${experimentRecurringRunsRoute(namespace, experimentId)}/create`;
 
-export const experimentsCloneRunRoute = (
+export const experimentsDuplicateRunRoute = (
   namespace: string | undefined,
   experimentId: string,
   runId: string,
-): string => `${experimentRunsRoute(namespace, experimentId)}/clone/${runId}`;
+): string => `${experimentRunsRoute(namespace, experimentId)}/duplicate/${runId}`;
 
-export const experimentsCloneRecurringRunRoute = (
+export const experimentsDuplicateRecurringRunRoute = (
   namespace: string | undefined,
   experimentId: string,
   recurringRunId: string,
-): string => `${experimentRecurringRunsRoute(namespace, experimentId)}/clone/${recurringRunId}`;
+): string => `${experimentRecurringRunsRoute(namespace, experimentId)}/duplicate/${recurringRunId}`;
 
 export const experimentRoute = (
   namespace: string | undefined,
@@ -75,8 +77,8 @@ export const experimentRecurringRunDetailsRoute = (
     ? experimentsBaseRoute(namespace)
     : `${experimentRecurringRunsRoute(namespace, experimentId)}/${recurringRunId}`;
 
-const generateCompareRunsQueryString = (runIds: string[]) =>
-  runIds.length > 0 ? `?runs=${runIds.join(',')}` : '';
+export const generateCompareRunsQueryString = (runIds: string[]): string =>
+  runIds.length > 0 ? `?${CompareRunsSearchParam.RUNS}=${runIds.join(',')}` : '';
 
 export const experimentsCompareRunsRoute = (
   namespace: string,

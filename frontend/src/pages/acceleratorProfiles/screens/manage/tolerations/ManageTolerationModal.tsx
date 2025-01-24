@@ -1,19 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Form } from '@patternfly/react-core';
+import { Form } from '@patternfly/react-core';
+import { Modal } from '@patternfly/react-core/deprecated';
 import { Toleration } from '~/types';
 import DashboardModalFooter from '~/concepts/dashboard/DashboardModalFooter';
 import TolerationFields from './TolerationFields';
 import { EMPTY_TOLERATION } from './const';
 
 type ManageTolerationModalProps = {
-  isOpen: boolean;
   onClose: () => void;
   initialToleration?: Toleration;
   onSave: (toleration: Toleration) => void;
 };
 
 const ManageTolerationModal: React.FC<ManageTolerationModalProps> = ({
-  isOpen,
   onClose,
   initialToleration,
   onSave,
@@ -41,7 +40,7 @@ const ManageTolerationModal: React.FC<ManageTolerationModalProps> = ({
     <Modal
       title={initialToleration ? 'Edit toleration' : 'Add toleration'}
       variant="medium"
-      isOpen={isOpen}
+      isOpen
       onClose={() => {
         onBeforeClose();
       }}

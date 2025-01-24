@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ExperimentKFv2, PipelinesFilterOp, StorageStateKF } from '~/concepts/pipelines/kfTypes';
+import { ExperimentKF, PipelinesFilterOp, StorageStateKF } from '~/concepts/pipelines/kfTypes';
 import { usePipelinesAPI } from '~/concepts/pipelines/context';
 import usePipelineQuery from '~/concepts/pipelines/apiHooks/usePipelineQuery';
 import { PipelineListPaged, PipelineOptions } from '~/concepts/pipelines/types';
@@ -8,9 +8,9 @@ import { FetchState } from '~/utilities/useFetchState';
 const useExperimentsByStorageState = (
   options?: PipelineOptions,
   storageState?: StorageStateKF,
-): FetchState<PipelineListPaged<ExperimentKFv2>> => {
+): FetchState<PipelineListPaged<ExperimentKF>> => {
   const { api } = usePipelinesAPI();
-  return usePipelineQuery<ExperimentKFv2>(
+  return usePipelineQuery<ExperimentKF>(
     React.useCallback(
       (opts, params) => {
         const predicates = params?.filter?.predicates || [];
@@ -35,17 +35,28 @@ const useExperimentsByStorageState = (
   );
 };
 
-const useExperiments = (options?: PipelineOptions): FetchState<PipelineListPaged<ExperimentKFv2>> =>
+const useExperiments = (options?: PipelineOptions): FetchState<PipelineListPaged<ExperimentKF>> =>
   useExperimentsByStorageState(options);
 
 export const useActiveExperiments = (
   options?: PipelineOptions,
-): FetchState<PipelineListPaged<ExperimentKFv2>> =>
-  useExperimentsByStorageState(options, StorageStateKF.AVAILABLE);
+): FetchState<PipelineListPaged<ExperimentKF>> => {
+  const { api } = usePipelinesAPI();
+  return usePipelineQuery<ExperimentKF>(
+    React.useCallback(
+      (opts, params) =>
+        api
+          .listActiveExperiments(opts, params)
+          .then((result) => ({ ...result, items: result.experiments })),
+      [api],
+    ),
+    options,
+  );
+};
 
 export const useArchivedExperiments = (
   options?: PipelineOptions,
-): FetchState<PipelineListPaged<ExperimentKFv2>> =>
+): FetchState<PipelineListPaged<ExperimentKF>> =>
   useExperimentsByStorageState(options, StorageStateKF.ARCHIVED);
 
 export default useExperiments;

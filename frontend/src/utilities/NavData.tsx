@@ -5,6 +5,7 @@ import {
   artifactsRootPath,
   executionsRootPath,
   experimentsRootPath,
+  pipelineRunsRootPath,
   pipelinesRootPath,
 } from '~/routes';
 
@@ -59,39 +60,49 @@ const useDSProjectsNav = (): NavDataItem[] =>
 
 const useDSPipelinesNav = (): NavDataItem[] => {
   const isAvailable = useIsAreaAvailable(SupportedArea.DS_PIPELINES).status;
-  const isExperimentsAvailable = useIsAreaAvailable(SupportedArea.PIPELINE_EXPERIMENTS).status;
 
   if (!isAvailable) {
     return [];
   }
 
   return [
-    { id: 'pipelines', label: 'Data Science Pipelines', href: pipelinesRootPath },
-    ...(isExperimentsAvailable
-      ? [
-          {
-            id: 'experiments',
-            group: { id: 'experiments', title: 'Experiments' },
-            children: [
-              {
-                id: 'experiments-and-runs',
-                label: 'Experiments and runs',
-                href: experimentsRootPath,
-              },
-              {
-                id: 'executions',
-                label: 'Executions',
-                href: executionsRootPath,
-              },
-              {
-                id: 'artifacts',
-                label: 'Artifacts',
-                href: artifactsRootPath,
-              },
-            ],
-          },
-        ]
-      : []),
+    {
+      id: 'pipelines-and-runs',
+      group: { id: 'pipelines-and-runs', title: 'Data Science Pipelines' },
+      children: [
+        {
+          id: 'pipelines',
+          label: 'Pipelines',
+          href: pipelinesRootPath,
+        },
+        {
+          id: 'runs',
+          label: 'Runs',
+          href: pipelineRunsRootPath,
+        },
+      ],
+    },
+    {
+      id: 'experiments',
+      group: { id: 'experiments', title: 'Experiments' },
+      children: [
+        {
+          id: 'experiments-and-runs',
+          label: 'Experiments and runs',
+          href: experimentsRootPath,
+        },
+        {
+          id: 'executions',
+          label: 'Executions',
+          href: executionsRootPath,
+        },
+        {
+          id: 'artifacts',
+          label: 'Artifacts',
+          href: artifactsRootPath,
+        },
+      ],
+    },
   ];
 };
 
@@ -186,11 +197,21 @@ const useAcceleratorProfilesNav = (): NavDataHref[] =>
     },
   ]);
 
+const useHardwareProfilesNav = (): NavDataHref[] =>
+  useAreaCheck<NavDataHref>(SupportedArea.HARDWARE_PROFILES, [
+    {
+      id: 'settings-hardware-profiles',
+      label: 'Hardware profiles',
+      href: '/hardwareProfiles',
+    },
+  ]);
+
 const useSettingsNav = (): NavDataGroup[] => {
   const settingsNavs: NavDataHref[] = [
     ...useCustomNotebooksNav(),
     ...useClusterSettingsNav(),
     ...useAcceleratorProfilesNav(),
+    ...useHardwareProfilesNav(),
     ...useCustomRuntimesNav(),
     ...useConnectionTypesNav(),
     ...useStorageClassesNav(),

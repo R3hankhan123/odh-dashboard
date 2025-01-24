@@ -2,20 +2,18 @@ import * as React from 'react';
 import { Stack, StackItem } from '@patternfly/react-core';
 import DeleteModal from '~/pages/projects/components/DeleteModal';
 import { usePipelinesAPI } from '~/concepts/pipelines/context';
-import { PipelineKFv2, PipelineVersionKFv2 } from '~/concepts/pipelines/kfTypes';
+import { PipelineKF, PipelineVersionKF } from '~/concepts/pipelines/kfTypes';
 import useDeleteStatuses from '~/concepts/pipelines/content/useDeleteStatuses';
 import DeletePipelineModalExpandableSection from '~/concepts/pipelines/content/DeletePipelineModalExpandableSection';
 import { getPipelineAndVersionDeleteString } from '~/concepts/pipelines/content/utils';
 
 type DeletePipelinesModalProps = {
-  isOpen: boolean;
-  toDeletePipelines?: PipelineKFv2[];
-  toDeletePipelineVersions?: { pipelineName: string; version: PipelineVersionKFv2 }[];
+  toDeletePipelines?: PipelineKF[];
+  toDeletePipelineVersions?: { pipelineName: string; version: PipelineVersionKF }[];
   onClose: (deleted?: boolean) => void;
 };
 
 const DeletePipelinesModal: React.FC<DeletePipelinesModalProps> = ({
-  isOpen,
   toDeletePipelines = [],
   toDeletePipelineVersions = [],
   onClose,
@@ -79,7 +77,6 @@ const DeletePipelinesModal: React.FC<DeletePipelinesModalProps> = ({
   return (
     <DeleteModal
       title={deleteTitle}
-      isOpen={isOpen}
       onClose={() => onBeforeClose(false)}
       deleting={deleting}
       error={error}

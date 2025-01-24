@@ -1,34 +1,41 @@
 import * as React from 'react';
 import {
   Alert,
-  Button,
+  Flex,
+  FlexItem,
   List,
   ListItem,
   Spinner,
   Stack,
   StackItem,
-  Text,
+  Content,
 } from '@patternfly/react-core';
-import { PlusCircleIcon } from '@patternfly/react-icons';
+
 import { NotebookKind } from '~/k8sTypes';
 import useNotebookPVCItems from '~/pages/projects/pvc/useNotebookPVCItems';
 import StorageSizeBar from '~/pages/projects/components/StorageSizeBars';
 import { getNotebookPVCMountPathMap } from '~/pages/projects/notebook/utils';
 import { getDisplayNameFromK8sResource } from '~/concepts/k8s/utils';
+import { ProjectObjectType } from '~/concepts/design/utils';
+import HeaderIcon from '~/concepts/design/HeaderIcon';
+import InlineTruncatedClipboardCopy from '~/components/InlineTruncatedClipboardCopy';
+import ShowAllButton from './ShowAllButton';
 
 type NotebookStorageBarsProps = {
   notebook: NotebookKind;
-  onAddStorage: (notebook: NotebookKind) => void;
 };
 
-const NotebookStorageBars: React.FC<NotebookStorageBarsProps> = ({ notebook, onAddStorage }) => {
+const NotebookStorageBars: React.FC<NotebookStorageBarsProps> = ({ notebook }) => {
   const [pvcs, loaded, loadError] = useNotebookPVCItems(notebook);
   const mountFolderMap = getNotebookPVCMountPathMap(notebook);
+  const [showAll, setShowAll] = React.useState(false);
+  const defaultVisibleLength = 2;
+  const visiblePvcs = showAll ? pvcs : pvcs.slice(0, defaultVisibleLength);
 
   return (
-    <Stack>
+    <Stack hasGutter>
       <StackItem>
-        <strong>Workbench storages</strong>
+        <strong data-testid="notebook-storage-bar-title">Cluster storage</strong>
       </StackItem>
       <StackItem>
         {!loaded ? (
@@ -39,39 +46,56 @@ const NotebookStorageBars: React.FC<NotebookStorageBarsProps> = ({ notebook, onA
           </Alert>
         ) : (
           <List isPlain>
-            {pvcs.map((pvc) => (
+            {visiblePvcs.map((pvc) => (
               <ListItem key={pvc.metadata.name}>
-                <Stack>
-                  <StackItem>
-                    <Text component="small">{getDisplayNameFromK8sResource(pvc)}</Text>
-                  </StackItem>
-                  <StackItem>
-                    <StorageSizeBar pvc={pvc} />
-                  </StackItem>
-                  <StackItem>
-                    <Text component="small">
-                      Mount path:{' '}
-                      {mountFolderMap[pvc.metadata.name]
-                        ? mountFolderMap[pvc.metadata.name]
-                        : 'Unknown'}
-                    </Text>
-                  </StackItem>
-                </Stack>
+                <Flex
+                  gap={{ default: 'gapSm' }}
+                  alignItems={{ default: 'alignItemsFlexStart' }}
+                  flexWrap={{ default: 'nowrap' }}
+                >
+                  <FlexItem>
+                    <HeaderIcon
+                      display="block"
+                      type={ProjectObjectType.clusterStorage}
+                      size={20}
+                      padding={2}
+                    />
+                  </FlexItem>
+                  <FlexItem>
+                    <Content>{getDisplayNameFromK8sResource(pvc)}</Content>
+                    <Stack>
+                      <StackItem>
+                        <StorageSizeBar pvc={pvc} />
+                      </StackItem>
+                      <StackItem>
+                        <Content>
+                          Mount path:{' '}
+                          {mountFolderMap[pvc.metadata.name] ? (
+                            <InlineTruncatedClipboardCopy
+                              maxWidth={225}
+                              testId="storage-mount-path"
+                              textToCopy={mountFolderMap[pvc.metadata.name]}
+                            />
+                          ) : (
+                            'unknown'
+                          )}
+                        </Content>
+                      </StackItem>
+                    </Stack>
+                  </FlexItem>
+                </Flex>
               </ListItem>
             ))}
-            <ListItem>
-              <Button
-                data-testid="add-storage-button"
-                variant="link"
-                isInline
-                icon={<PlusCircleIcon />}
-                onClick={() => onAddStorage(notebook)}
-              >
-                Add storage
-              </Button>
-            </ListItem>
           </List>
         )}
+      </StackItem>
+      <StackItem>
+        <ShowAllButton
+          isExpanded={showAll}
+          visibleLength={defaultVisibleLength}
+          onToggle={() => setShowAll(!showAll)}
+          totalSize={pvcs.length}
+        />
       </StackItem>
     </Stack>
   );

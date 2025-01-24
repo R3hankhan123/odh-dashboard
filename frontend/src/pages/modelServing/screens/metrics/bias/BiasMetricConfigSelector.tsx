@@ -1,6 +1,6 @@
 import React from 'react';
 import { useModelBiasData } from '~/concepts/trustyai/context/useModelBiasData';
-import { BiasMetricConfig } from '~/concepts/trustyai/types';
+import { BiasMetricConfig, TrustyInstallState } from '~/concepts/trustyai/types';
 import { BiasMetricType } from '~/api';
 import { MultiSelection, SelectionOptions } from '~/components/MultiSelection';
 
@@ -13,9 +13,7 @@ const BiasMetricConfigSelector: React.FC<BiasMetricConfigSelectorProps> = ({
   onChange,
   initialSelections,
 }) => {
-  const { biasMetricConfigs, loaded } = useModelBiasData();
-  const [uiSelections, setUISelections] = React.useState<string>();
-  const [currentSelections, setCurrentSelections] = React.useState<string>();
+  const { biasMetricConfigs, statusState } = useModelBiasData();
   const elementId = React.useId();
 
   const spdConfigs = biasMetricConfigs.filter((x) => x.metricType === BiasMetricType.SPD);
@@ -26,10 +24,6 @@ const BiasMetricConfigSelector: React.FC<BiasMetricConfigSelectorProps> = ({
       <span id={elementId} hidden>
         Select the metrics to display charts for
       </span>
-      <div>ALL: {biasMetricConfigs.map((c) => c.name).join(', ')}</div>
-      <div>UI: {uiSelections}</div>
-      <div>current: {currentSelections}</div>
-      <div>initialSelections: {initialSelections.map((s) => s.name).join(', ')}</div>
       <MultiSelection
         ariaLabel="Select a metric"
         groupedValues={[
@@ -53,12 +47,6 @@ const BiasMetricConfigSelector: React.FC<BiasMetricConfigSelectorProps> = ({
           },
         ]}
         setValue={(newState: SelectionOptions[]) => {
-          setUISelections(
-            newState
-              .filter((s) => s.selected)
-              .map((s) => s.name)
-              .join(', '),
-          );
           const selections = newState.reduce<BiasMetricConfig[]>((acc, item) => {
             if (item.selected) {
               const selectedConfig = biasMetricConfigs.find((s) => s.id === item.id);
@@ -68,13 +56,14 @@ const BiasMetricConfigSelector: React.FC<BiasMetricConfigSelectorProps> = ({
             }
             return acc;
           }, []);
-          setCurrentSelections(selections.map((s) => s.name).join(', '));
           onChange(selections);
         }}
         selectionRequired
         noSelectedOptionsMessage="One or more groups must be seleted"
         placeholder="Select a metric"
-        isDisabled={!(loaded && biasMetricConfigs.length > 0)}
+        isDisabled={
+          !(statusState.type === TrustyInstallState.INSTALLED && biasMetricConfigs.length > 0)
+        }
         id="bias-metric-config-selector"
         toggleId="bias-metric-config-selector"
       />

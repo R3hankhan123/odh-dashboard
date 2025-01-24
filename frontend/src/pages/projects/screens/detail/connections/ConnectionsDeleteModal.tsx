@@ -1,14 +1,11 @@
 import React from 'react';
-import { K8sStatus } from '@openshift/dynamic-plugin-sdk-utils';
 import {
   Badge,
   Bullseye,
   ExpandableSection,
   ExpandableSectionToggle,
   Spinner,
-  TextContent,
-  TextList,
-  TextListItem,
+  Content,
 } from '@patternfly/react-core';
 import { getDisplayNameFromK8sResource } from '~/concepts/k8s/utils';
 import { Connection } from '~/concepts/connectionTypes/types';
@@ -19,28 +16,30 @@ import {
 } from '~/pages/projects/notebook/useRelatedNotebooks';
 import { useNotebooksStates } from '~/pages/projects/notebook/useNotebooksStates';
 import { NotebookKind } from '~/k8sTypes';
+import { useInferenceServicesForConnection } from '~/pages/projects/useInferenceServicesForConnection';
+import { deleteSecret, removeNotebookSecret } from '~/api';
 
 type Props = {
   namespace: string;
   deleteConnection: Connection;
   onClose: (deleted?: boolean) => void;
-  onDelete: () => Promise<K8sStatus>;
 };
 
 export const ConnectionsDeleteModal: React.FC<Props> = ({
   namespace,
   deleteConnection,
   onClose,
-  onDelete,
 }) => {
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [error, setError] = React.useState<Error>();
-  const { notebooks: connectedNotebooks, loaded: notebooksLoaded } = useRelatedNotebooks(
+  const { notebooks: connectedNotebooks, loaded } = useRelatedNotebooks(
     ConnectedNotebookContext.EXISTING_DATA_CONNECTION,
     deleteConnection.metadata.name,
   );
   const [notebookStates] = useNotebooksStates(connectedNotebooks, namespace);
   const [notebooksExpanded, setNotebooksExpanded] = React.useState<boolean>(false);
+  const connectedModels = useInferenceServicesForConnection(deleteConnection);
+  const [modelsExpanded, setModelsExpanded] = React.useState<boolean>(false);
 
   const getNotebookStatusText = React.useCallback(
     (notebook: NotebookKind) =>
@@ -53,14 +52,23 @@ export const ConnectionsDeleteModal: React.FC<Props> = ({
   return (
     <DeleteModal
       title="Delete connection?"
-      isOpen
       onClose={onClose}
       submitButtonLabel="Delete"
       onDelete={() => {
         setIsDeleting(true);
         setError(undefined);
-
-        onDelete()
+        Promise.all(
+          connectedNotebooks.map((notebook) =>
+            removeNotebookSecret(
+              notebook.metadata.name,
+              notebook.metadata.namespace,
+              deleteConnection.metadata.name,
+            ),
+          ),
+        )
+          .then(() =>
+            deleteSecret(deleteConnection.metadata.namespace, deleteConnection.metadata.name),
+          )
           .then(() => {
             onClose(true);
           })
@@ -75,44 +83,91 @@ export const ConnectionsDeleteModal: React.FC<Props> = ({
     >
       The <b>{getDisplayNameFromK8sResource(deleteConnection)}</b> connection will be deleted, and
       its dependent resources will stop working.
-      {notebooksLoaded && !connectedNotebooks.length ? null : (
-        <div className="pf-v5-u-mt-md">
-          {!notebooksLoaded ? (
+      {loaded && !connectedNotebooks.length && !connectedModels.length ? null : (
+        <div className="pf-v6-u-mt-md">
+          {!loaded ? (
             <Bullseye>
               <Spinner size="md" />
             </Bullseye>
           ) : (
             <>
-              <ExpandableSectionToggle
-                isExpanded={notebooksExpanded}
-                onToggle={setNotebooksExpanded}
-                contentId="expanded-connected-notebooks"
-                data-testid="connections-delete-notebooks-toggle"
-              >
-                <span>Workbenches </span>
-                <Badge isRead data-testid="connections-delete-notebooks-count">
-                  {connectedNotebooks.length}
-                </Badge>
-              </ExpandableSectionToggle>
-              <ExpandableSection
-                isExpanded={notebooksExpanded}
-                isDetached
-                contentId="expanded-connected-notebooks"
-              >
-                <TextContent>
-                  <TextList>
-                    {connectedNotebooks.map((notebook) => (
-                      <TextListItem
-                        key={notebook.metadata.name}
-                        data-testid="connections-delete-notebooks-item"
-                      >
-                        {getDisplayNameFromK8sResource(notebook)}
-                        {getNotebookStatusText(notebook)}
-                      </TextListItem>
-                    ))}
-                  </TextList>
-                </TextContent>
-              </ExpandableSection>
+              {connectedNotebooks.length ? (
+                <>
+                  <ExpandableSectionToggle
+                    isExpanded={notebooksExpanded}
+                    onToggle={setNotebooksExpanded}
+                    id="expand-connected-notebooks-toggle"
+                    contentId="expanded-connected-notebooks"
+                    data-testid="connections-delete-notebooks-toggle"
+                  >
+                    <span>Workbenches </span>
+                    <Badge isRead data-testid="connections-delete-notebooks-count">
+                      {connectedNotebooks.length}
+                    </Badge>
+                  </ExpandableSectionToggle>
+                  {notebooksExpanded ? (
+                    <ExpandableSection
+                      isExpanded
+                      isDetached
+                      contentId="expanded-connected-notebooks"
+                      toggleId="expand-connected-notebooks-toggle"
+                    >
+                      <Content>
+                        <Content component="ul">
+                          {connectedNotebooks.map((notebook) => (
+                            <Content
+                              component="li"
+                              key={notebook.metadata.name}
+                              data-testid="connections-delete-notebooks-item"
+                            >
+                              {getDisplayNameFromK8sResource(notebook)}
+                              {getNotebookStatusText(notebook)}
+                            </Content>
+                          ))}
+                        </Content>
+                      </Content>
+                    </ExpandableSection>
+                  ) : null}
+                </>
+              ) : null}
+              {connectedModels.length ? (
+                <>
+                  <ExpandableSectionToggle
+                    isExpanded={modelsExpanded}
+                    onToggle={setModelsExpanded}
+                    id="expand-connected-models-toggle"
+                    contentId="expanded-connected-models"
+                    data-testid="connections-delete-models-toggle"
+                  >
+                    <span>Model deployments </span>
+                    <Badge isRead data-testid="connections-delete-models-count">
+                      {connectedModels.length}
+                    </Badge>
+                  </ExpandableSectionToggle>
+                  {modelsExpanded ? (
+                    <ExpandableSection
+                      isExpanded
+                      isDetached
+                      toggleId="expand-connected-models-toggle"
+                      contentId="expanded-connected-models"
+                    >
+                      <Content>
+                        <Content component="ul">
+                          {connectedModels.map((model) => (
+                            <Content
+                              component="li"
+                              key={model.metadata.name}
+                              data-testid="connections-delete-models-item"
+                            >
+                              {getDisplayNameFromK8sResource(model)}
+                            </Content>
+                          ))}
+                        </Content>
+                      </Content>
+                    </ExpandableSection>
+                  ) : null}
+                </>
+              ) : null}
             </>
           )}
         </div>

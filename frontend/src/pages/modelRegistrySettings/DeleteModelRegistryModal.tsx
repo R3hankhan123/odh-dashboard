@@ -1,19 +1,18 @@
 import React from 'react';
-import { Modal, TextContent, Text, TextInput, Stack, StackItem } from '@patternfly/react-core';
+import { Content, TextInput, Stack, StackItem } from '@patternfly/react-core';
+import { Modal } from '@patternfly/react-core/deprecated';
 import { ModelRegistryKind } from '~/k8sTypes';
 import DashboardModalFooter from '~/concepts/dashboard/DashboardModalFooter';
 import { deleteModelRegistryBackend } from '~/services/modelRegistrySettingsService';
 
 type DeleteModelRegistryModalProps = {
   modelRegistry: ModelRegistryKind;
-  isOpen: boolean;
   onClose: () => void;
   refresh: () => Promise<unknown>;
 };
 
 const DeleteModelRegistryModal: React.FC<DeleteModelRegistryModalProps> = ({
   modelRegistry: mr,
-  isOpen,
   onClose,
   refresh,
 }) => {
@@ -49,7 +48,7 @@ const DeleteModelRegistryModal: React.FC<DeleteModelRegistryModalProps> = ({
       data-testid="delete-mr-modal"
       titleIconVariant="warning"
       title="Delete model registry?"
-      isOpen={isOpen}
+      isOpen
       onClose={onClose}
       variant="medium"
       footer={
@@ -67,16 +66,16 @@ const DeleteModelRegistryModal: React.FC<DeleteModelRegistryModalProps> = ({
     >
       <Stack hasGutter>
         <StackItem>
-          <TextContent>
-            <Text component="p">
+          <Content>
+            <Content component="p">
               The <strong>{mr.metadata.name}</strong> model registry, its default group, and any
               permissions associated with it will be deleted. Data located in the database connected
               to the registry will be unaffected.
-            </Text>
-            <Text component="p">
+            </Content>
+            <Content component="p">
               Type <strong>{mr.metadata.name}</strong> to confirm deletion:
-            </Text>
-          </TextContent>
+            </Content>
+          </Content>
         </StackItem>
         <StackItem>
           <TextInput

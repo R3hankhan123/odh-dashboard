@@ -1,19 +1,17 @@
 import * as React from 'react';
-import { Modal } from '@patternfly/react-core';
+import { Modal } from '@patternfly/react-core/deprecated';
 import DashboardModalFooter from '~/concepts/dashboard/DashboardModalFooter';
 import useNotification from '~/utilities/useNotification';
 
 interface RestoreModelVersionModalProps {
   onCancel: () => void;
   onSubmit: () => void;
-  isOpen: boolean;
   modelVersionName: string;
 }
 
 export const RestoreModelVersionModal: React.FC<RestoreModelVersionModalProps> = ({
   onCancel,
   onSubmit,
-  isOpen,
   modelVersionName,
 }) => {
   const notification = useNotification();
@@ -42,8 +40,8 @@ export const RestoreModelVersionModal: React.FC<RestoreModelVersionModalProps> =
 
   return (
     <Modal
-      isOpen={isOpen}
-      title="Restore version?"
+      isOpen
+      title="Restore model version?"
       variant="small"
       onClose={onClose}
       footer={

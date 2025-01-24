@@ -1,16 +1,13 @@
 import React from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 import { Button, Skeleton, Tooltip } from '@patternfly/react-core';
 import { TableVariant, Td } from '@patternfly/react-table';
 import { ColumnsIcon } from '@patternfly/react-icons';
 
 import { TableBase, getTableColumnSort, useCheckboxTable } from '~/components/table';
-import { ArtifactType, PipelineRunKFv2 } from '~/concepts/pipelines/kfTypes';
-import {
-  getExperimentRunColumns,
-  pipelineRunColumns,
-} from '~/concepts/pipelines/content/tables/columns';
+import { PipelineRunKF } from '~/concepts/pipelines/kfTypes';
+import { getPipelineRunColumns } from '~/concepts/pipelines/content/tables/columns';
 import PipelineRunTableRow from '~/concepts/pipelines/content/tables/pipelineRun/PipelineRunTableRow';
 import DashboardEmptyTableView from '~/concepts/dashboard/DashboardEmptyTableView';
 import PipelineRunTableToolbar from '~/concepts/pipelines/content/tables/pipelineRun/PipelineRunTableToolbar';
@@ -18,24 +15,21 @@ import DeletePipelineRunsModal from '~/concepts/pipelines/content/DeletePipeline
 import { usePipelinesAPI } from '~/concepts/pipelines/context';
 import { PipelineRunType } from '~/pages/pipelines/global/runs/types';
 import { PipelinesFilter } from '~/concepts/pipelines/types';
-import usePipelineFilter from '~/concepts/pipelines/content/tables/usePipelineFilter';
+import { usePipelineFilterSearchParams } from '~/concepts/pipelines/content/tables/usePipelineFilter';
 import SimpleMenuActions from '~/components/SimpleMenuActions';
 import { ArchiveRunModal } from '~/pages/pipelines/global/runs/ArchiveRunModal';
 import { RestoreRunModal } from '~/pages/pipelines/global/runs/RestoreRunModal';
-import { useSetVersionFilter } from '~/concepts/pipelines/content/tables/useSetVersionFilter';
-import { createRunRoute, experimentsCompareRunsRoute } from '~/routes';
-import { SupportedArea, useIsAreaAvailable } from '~/concepts/areas';
-import { useContextExperimentArchived } from '~/pages/pipelines/global/experiments/ExperimentContext';
-import { getArtifactProperties } from '~/concepts/pipelines/content/pipelinesDetails/pipelineRun/artifacts/utils';
-import { useGetArtifactsByRuns } from '~/concepts/pipelines/apiHooks/mlmd/useGetArtifactsByRuns';
-import { ArtifactProperty } from '~/concepts/pipelines/content/pipelinesDetails/pipelineRun/artifacts/types';
+import { compareRunsRoute, createRunRoute } from '~/routes';
+import {
+  ExperimentContext,
+  useContextExperimentArchivedOrDeleted,
+} from '~/pages/pipelines/global/experiments/ExperimentContext';
 import { CustomMetricsColumnsModal } from './CustomMetricsColumnsModal';
-import { RunWithMetrics } from './types';
 import { UnavailableMetricValue } from './UnavailableMetricValue';
-import { useMetricColumnNames } from './useMetricColumnNames';
+import { useMetricColumns } from './useMetricColumns';
 
 type PipelineRunTableProps = {
-  runs: PipelineRunKFv2[];
+  runs: PipelineRunKF[];
   loading?: boolean;
   totalSize: number;
   page: number;
@@ -50,32 +44,24 @@ type PipelineRunTableProps = {
   runType: PipelineRunType.ACTIVE | PipelineRunType.ARCHIVED;
 };
 
-interface PipelineRunTableInternalProps extends Omit<PipelineRunTableProps, 'runs'> {
-  runs: RunWithMetrics[];
-  artifactsLoaded: boolean;
-  artifactsError: Error | undefined;
-  metricsNames: Set<string>;
-}
-
-const PipelineRunTableInternal: React.FC<PipelineRunTableInternalProps> = ({
-  runs,
+const PipelineRunTable: React.FC<PipelineRunTableProps> = ({
+  runs: runWithoutMetrics,
   loading,
   totalSize,
   page,
   pageSize,
   runType,
-  metricsNames,
-  artifactsLoaded,
-  artifactsError,
   setPage,
   setPageSize,
   setFilter,
   ...tableProps
 }) => {
   const navigate = useNavigate();
-  const { experimentId, pipelineVersionId, pipelineId } = useParams();
+  const { experiment } = React.useContext(ExperimentContext);
   const { namespace, refreshAllAPI } = usePipelinesAPI();
-  const { onClearFilters, ...filterToolbarProps } = usePipelineFilter(setFilter);
+  const { onClearFilters, ...filterToolbarProps } = usePipelineFilterSearchParams(setFilter);
+  const { metricsColumnNames, runs, runArtifactsError, runArtifactsLoaded, metricsNames } =
+    useMetricColumns(runWithoutMetrics, experiment?.experiment_id);
   const {
     selections: selectedIds,
     tableProps: checkboxTableProps,
@@ -83,12 +69,11 @@ const PipelineRunTableInternal: React.FC<PipelineRunTableInternalProps> = ({
     isSelected,
     setSelections: setSelectedIds,
   } = useCheckboxTable(runs.map(({ run_id: runId }) => runId));
-  const isExperimentsAvailable = useIsAreaAvailable(SupportedArea.PIPELINE_EXPERIMENTS).status;
   const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
   const [isArchiveModalOpen, setIsArchiveModalOpen] = React.useState(false);
   const [isRestoreModalOpen, setIsRestoreModalOpen] = React.useState(false);
   const [isCustomColModalOpen, setIsCustomColModalOpen] = React.useState(false);
-  const selectedRuns = selectedIds.reduce((acc: PipelineRunKFv2[], selectedId) => {
+  const selectedRuns = selectedIds.reduce((acc: PipelineRunKF[], selectedId) => {
     const selectedRun = runs.find((run) => run.run_id === selectedId);
 
     if (selectedRun) {
@@ -98,9 +83,7 @@ const PipelineRunTableInternal: React.FC<PipelineRunTableInternalProps> = ({
     return acc;
   }, []);
   const restoreButtonTooltipRef = React.useRef(null);
-  const isExperimentArchived = useContextExperimentArchived();
-  const isExperimentsEnabled = isExperimentsAvailable && experimentId;
-  const metricsColumnNames = useMetricColumnNames(experimentId ?? '', metricsNames);
+  const { isExperimentArchived } = useContextExperimentArchivedOrDeleted();
 
   const primaryToolbarAction = React.useMemo(() => {
     if (runType === PipelineRunType.ARCHIVED) {
@@ -131,16 +114,7 @@ const PipelineRunTableInternal: React.FC<PipelineRunTableInternalProps> = ({
         key="create-run"
         data-testid="create-run-button"
         variant="primary"
-        onClick={() =>
-          navigate(
-            createRunRoute(
-              namespace,
-              isExperimentsAvailable ? experimentId : undefined,
-              pipelineId,
-              pipelineVersionId,
-            ),
-          )
-        }
+        onClick={() => navigate(createRunRoute(namespace, experiment?.experiment_id))}
       >
         Create run
       </Button>
@@ -151,14 +125,11 @@ const PipelineRunTableInternal: React.FC<PipelineRunTableInternalProps> = ({
     selectedIds.length,
     navigate,
     namespace,
-    isExperimentsAvailable,
-    experimentId,
-    pipelineId,
-    pipelineVersionId,
+    experiment?.experiment_id,
   ]);
 
   const compareRunsAction =
-    isExperimentsEnabled && !isExperimentArchived ? (
+    !isExperimentArchived && runType === PipelineRunType.ACTIVE ? (
       <Tooltip content="Select up to 10 runs to compare.">
         <Button
           key="compare-runs"
@@ -166,7 +137,7 @@ const PipelineRunTableInternal: React.FC<PipelineRunTableInternalProps> = ({
           variant="secondary"
           isAriaDisabled={selectedIds.length === 0 || selectedIds.length > 10}
           onClick={() =>
-            navigate(experimentsCompareRunsRoute(namespace, experimentId, selectedIds))
+            navigate(compareRunsRoute(namespace, selectedIds, experiment?.experiment_id))
           }
         >
           Compare runs
@@ -200,27 +171,15 @@ const PipelineRunTableInternal: React.FC<PipelineRunTableInternalProps> = ({
     />
   );
 
-  useSetVersionFilter(filterToolbarProps.onFilterUpdate);
-
-  const getColumns = () => {
-    let columns = isExperimentsEnabled
-      ? getExperimentRunColumns(metricsColumnNames)
-      : pipelineRunColumns;
-    if (isExperimentsEnabled) {
-      columns = columns.filter((column) => column.field !== 'experiment');
-    }
-    if (pipelineVersionId) {
-      columns = columns.filter((column) => column.field !== 'pipeline_version');
-    }
-
-    return columns;
-  };
+  const columns = experiment
+    ? getPipelineRunColumns(metricsColumnNames).filter((column) => column.field !== 'experiment')
+    : getPipelineRunColumns(metricsColumnNames);
 
   return (
     <>
       <TableBase
         {...checkboxTableProps}
-        {...(isExperimentsEnabled && { hasStickyColumns: true })}
+        hasStickyColumns
         loading={loading}
         page={page}
         perPage={pageSize}
@@ -232,7 +191,7 @@ const PipelineRunTableInternal: React.FC<PipelineRunTableInternalProps> = ({
         onPerPageSelect={(_, newSize) => setPageSize(newSize)}
         itemCount={totalSize}
         data={runs}
-        columns={getColumns()}
+        columns={columns}
         enablePagination="compact"
         emptyTableView={<DashboardEmptyTableView onClearFilters={onClearFilters} />}
         onClearFilters={onClearFilters}
@@ -244,30 +203,28 @@ const PipelineRunTableInternal: React.FC<PipelineRunTableInternalProps> = ({
               primaryToolbarAction,
               ...(compareRunsAction ? [compareRunsAction] : []),
               toolbarDropdownAction,
-              isExperimentsEnabled
-                ? [
-                    <Tooltip
-                      key="custom-metrics-columns"
-                      content={
-                        !artifactsLoaded
-                          ? 'Customize metrics columns: Loading metrics...'
-                          : !(metricsColumnNames.length || metricsNames.size)
-                          ? 'Customize metrics columns: No metrics available'
-                          : 'Customize metrics columns'
-                      }
-                    >
-                      <Button
-                        variant="plain"
-                        aria-label="Customize metrics column button"
-                        isAriaDisabled={
-                          !artifactsLoaded || !(metricsColumnNames.length || metricsNames.size)
-                        }
-                        onClick={() => setIsCustomColModalOpen(true)}
-                        icon={<ColumnsIcon />}
-                      />
-                    </Tooltip>,
-                  ]
-                : [],
+              [
+                <Tooltip
+                  key="custom-metrics-columns"
+                  content={
+                    !runArtifactsLoaded
+                      ? 'Customize metrics columns: Loading metrics...'
+                      : !(metricsColumnNames.length || metricsNames.size)
+                      ? 'Customize metrics columns: No metrics available'
+                      : 'Customize metrics columns'
+                  }
+                >
+                  <Button
+                    variant="plain"
+                    aria-label="Customize metrics column button"
+                    isAriaDisabled={
+                      !runArtifactsLoaded || !(metricsColumnNames.length || metricsNames.size)
+                    }
+                    onClick={() => setIsCustomColModalOpen(true)}
+                    icon={<ColumnsIcon />}
+                  />
+                </Tooltip>,
+              ],
             ]}
           />
         }
@@ -277,7 +234,7 @@ const PipelineRunTableInternal: React.FC<PipelineRunTableInternalProps> = ({
             checkboxProps={{
               isChecked: isSelected(run.run_id),
               onToggle: () => toggleSelection(run.run_id),
-              isStickyColumn: !!isExperimentsEnabled,
+              isStickyColumn: true,
               stickyMinWidth: '45px',
             }}
             onDelete={() => {
@@ -285,10 +242,9 @@ const PipelineRunTableInternal: React.FC<PipelineRunTableInternalProps> = ({
               setIsDeleteModalOpen(true);
             }}
             run={run}
-            hasExperiments={!isExperimentsEnabled}
             customCells={metricsColumnNames.map((metricName: string) => (
               <Td key={metricName} dataLabel={metricName}>
-                {!artifactsLoaded && !artifactsError ? (
+                {!runArtifactsLoaded && !runArtifactsError ? (
                   <Skeleton />
                 ) : (
                   run.metrics.find((metric) => metric.name === metricName)?.value ?? (
@@ -302,28 +258,30 @@ const PipelineRunTableInternal: React.FC<PipelineRunTableInternalProps> = ({
         )}
         variant={TableVariant.compact}
         getColumnSort={getTableColumnSort({
-          columns: getColumns(),
+          columns,
           ...tableProps,
         })}
         data-testid={`${runType}-runs-table`}
         id={`${runType}-runs-table`}
       />
-      <ArchiveRunModal
-        isOpen={isArchiveModalOpen}
-        runs={selectedRuns}
-        onCancel={() => {
-          setIsArchiveModalOpen(false);
-          setSelectedIds([]);
-        }}
-      />
-      <RestoreRunModal
-        isOpen={isRestoreModalOpen}
-        runs={selectedRuns}
-        onCancel={() => {
-          setIsRestoreModalOpen(false);
-          setSelectedIds([]);
-        }}
-      />
+      {isArchiveModalOpen && (
+        <ArchiveRunModal
+          runs={selectedRuns}
+          onCancel={() => {
+            setIsArchiveModalOpen(false);
+            setSelectedIds([]);
+          }}
+        />
+      )}
+      {isRestoreModalOpen && (
+        <RestoreRunModal
+          runs={selectedRuns}
+          onCancel={() => {
+            setIsRestoreModalOpen(false);
+            setSelectedIds([]);
+          }}
+        />
+      )}
       {isDeleteModalOpen && (
         <DeletePipelineRunsModal
           toDeleteResources={selectedRuns}
@@ -340,7 +298,7 @@ const PipelineRunTableInternal: React.FC<PipelineRunTableInternalProps> = ({
       {isCustomColModalOpen && (
         <CustomMetricsColumnsModal
           key={metricsNames.size}
-          experimentId={experimentId}
+          experimentId={experiment?.experiment_id}
           columns={[...new Set([...metricsColumnNames, ...metricsNames])].map((metricName) => ({
             id: metricName,
             content: metricName,
@@ -350,42 +308,6 @@ const PipelineRunTableInternal: React.FC<PipelineRunTableInternalProps> = ({
         />
       )}
     </>
-  );
-};
-
-const PipelineRunTable: React.FC<PipelineRunTableProps> = ({ runs, page, ...props }) => {
-  const [runArtifacts, runArtifactsLoaded, runArtifactsError] = useGetArtifactsByRuns(runs);
-  const metricsNames = new Set<string>();
-
-  const runsWithMetrics = runs.map((run) => ({
-    ...run,
-    metrics: runArtifacts.reduce((acc: ArtifactProperty[], runArtifactsMap) => {
-      const artifacts = Object.entries(runArtifactsMap).find(
-        ([runId]) => run.run_id === runId,
-      )?.[1];
-
-      artifacts?.forEach((artifact) => {
-        if (artifact.getType() === ArtifactType.METRICS) {
-          const artifactProperties = getArtifactProperties(artifact);
-
-          artifactProperties.map((artifactProp) => metricsNames.add(artifactProp.name));
-          acc.push(...artifactProperties);
-        }
-      });
-
-      return acc;
-    }, []),
-  }));
-
-  return (
-    <PipelineRunTableInternal
-      runs={runsWithMetrics}
-      page={page}
-      metricsNames={metricsNames}
-      artifactsLoaded={runArtifactsLoaded}
-      artifactsError={runArtifactsError}
-      {...props}
-    />
   );
 };
 

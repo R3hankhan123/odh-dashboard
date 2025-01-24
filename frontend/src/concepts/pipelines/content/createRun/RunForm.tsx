@@ -6,9 +6,9 @@ import { ValueOf } from '~/typeHelpers';
 import { ParamsSection } from '~/concepts/pipelines/content/createRun/contentSections/ParamsSection';
 import RunTypeSectionScheduled from '~/concepts/pipelines/content/createRun/contentSections/RunTypeSectionScheduled';
 import {
-  PipelineRecurringRunKFv2,
-  PipelineRunKFv2,
-  PipelineVersionKFv2,
+  PipelineRecurringRunKF,
+  PipelineRunKF,
+  PipelineVersionKF,
   RuntimeConfigParameters,
 } from '~/concepts/pipelines/kfTypes';
 import ProjectAndExperimentSection from '~/concepts/pipelines/content/createRun/contentSections/ProjectAndExperimentSection';
@@ -31,10 +31,10 @@ import { getInputDefinitionParams } from './utils';
 type RunFormProps = {
   data: RunFormData;
   onValueChange: (key: keyof RunFormData, value: ValueOf<RunFormData>) => void;
-  isCloned: boolean;
+  isDuplicated: boolean;
 };
 
-const RunForm: React.FC<RunFormProps> = ({ data, onValueChange, isCloned }) => {
+const RunForm: React.FC<RunFormProps> = ({ data, onValueChange, isDuplicated }) => {
   const { api } = usePipelinesAPI();
   const [latestVersion] = useLatestPipelineVersion(data.pipeline?.pipeline_id);
   // Use this state to avoid the pipeline version being set as the latest version at the initial load
@@ -57,7 +57,7 @@ const RunForm: React.FC<RunFormProps> = ({ data, onValueChange, isCloned }) => {
     React.useCallback(
       async (value: string) => {
         if (value) {
-          let duplicateRuns: PipelineRunKFv2[] | PipelineRecurringRunKFv2[] | undefined = [];
+          let duplicateRuns: PipelineRunKF[] | PipelineRecurringRunKF[] | undefined = [];
 
           if (isSchedule) {
             const { recurringRuns } = await api.listPipelineRecurringRuns(
@@ -81,7 +81,7 @@ const RunForm: React.FC<RunFormProps> = ({ data, onValueChange, isCloned }) => {
   );
 
   const updateInputParams = React.useCallback(
-    (version: PipelineVersionKFv2 | undefined) =>
+    (version: PipelineVersionKF | undefined) =>
       onValueChange(
         'params',
         Object.entries(getInputDefinitionParams(version) || {}).reduce(
@@ -104,7 +104,7 @@ const RunForm: React.FC<RunFormProps> = ({ data, onValueChange, isCloned }) => {
 
   return (
     <Form onSubmit={(e) => e.preventDefault()} maxWidth="500px">
-      <RunTypeSection data={data} isCloned={isCloned} />
+      <RunTypeSection data={data} isDuplicated={isDuplicated} />
 
       <ProjectAndExperimentSection
         projectName={getDisplayNameFromK8sResource(data.project)}

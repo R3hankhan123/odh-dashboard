@@ -21,23 +21,32 @@ import FormSection from '~/components/pf-overrides/FormSection';
 import { ModelVersion } from '~/concepts/modelRegistry/types';
 import { ModelLocationType, RegistrationCommonFormData } from './useRegisterModelData';
 import { ConnectionModal } from './ConnectionModal';
+import { MR_CHARACTER_LIMIT } from './const';
+import { isNameValid } from './utils';
 
-type RegistrationCommonFormSectionsProps = {
-  formData: RegistrationCommonFormData;
-  setData: UpdateObjectAtPropAndValue<RegistrationCommonFormData>;
+type RegistrationCommonFormSectionsProps<D extends RegistrationCommonFormData> = {
+  formData: D;
+  setData: UpdateObjectAtPropAndValue<D>;
   isFirstVersion: boolean;
   latestVersion?: ModelVersion;
 };
 
-const RegistrationCommonFormSections: React.FC<RegistrationCommonFormSectionsProps> = ({
+const RegistrationCommonFormSections = <D extends RegistrationCommonFormData>({
   formData,
   setData,
   isFirstVersion,
   latestVersion,
-}) => {
+}: RegistrationCommonFormSectionsProps<D>): React.ReactNode => {
   const [isAutofillModalOpen, setAutofillModalOpen] = React.useState(false);
+  const isVersionNameValid = isNameValid(formData.versionName);
 
-  const connectionDataMap: Record<string, keyof RegistrationCommonFormData> = {
+  const connectionDataMap: Record<
+    string,
+    keyof Pick<
+      RegistrationCommonFormData,
+      'modelLocationEndpoint' | 'modelLocationBucket' | 'modelLocationRegion'
+    >
+  > = {
     AWS_S3_ENDPOINT: 'modelLocationEndpoint',
     AWS_S3_BUCKET: 'modelLocationBucket',
     AWS_DEFAULT_REGION: 'modelLocationRegion',
@@ -80,14 +89,22 @@ const RegistrationCommonFormSections: React.FC<RegistrationCommonFormSectionsPro
             name="version-name"
             value={versionName}
             onChange={(_e, value) => setData('versionName', value)}
+            validated={isVersionNameValid ? 'default' : 'error'}
           />
-          {latestVersion && (
-            <FormHelperText>
+          <FormHelperText>
+            {latestVersion && (
               <HelperText>
                 <HelperTextItem>Current version is {latestVersion.name}</HelperTextItem>
               </HelperText>
-            </FormHelperText>
-          )}
+            )}
+            {!isVersionNameValid && (
+              <HelperText>
+                <HelperTextItem variant="error">
+                  Cannot exceed {MR_CHARACTER_LIMIT} characters
+                </HelperTextItem>
+              </HelperText>
+            )}
+          </FormHelperText>
         </FormGroup>
         <FormGroup label="Version description" fieldId="version-description">
           <TextArea
@@ -140,7 +157,6 @@ const RegistrationCommonFormSections: React.FC<RegistrationCommonFormSectionsPro
               <Button
                 data-testid="object-storage-autofill-button"
                 variant="link"
-                isInline
                 icon={<OptimizeIcon />}
                 onClick={() => setAutofillModalOpen(true)}
               >
@@ -235,14 +251,15 @@ const RegistrationCommonFormSections: React.FC<RegistrationCommonFormSectionsPro
           }
         />
       </FormSection>
-      <ConnectionModal
-        isOpen={isAutofillModalOpen}
-        onClose={() => setAutofillModalOpen(false)}
-        onSubmit={(connection) => {
-          fillObjectStorageByConnection(connection);
-          setAutofillModalOpen(false);
-        }}
-      />
+      {isAutofillModalOpen ? (
+        <ConnectionModal
+          onClose={() => setAutofillModalOpen(false)}
+          onSubmit={(connection) => {
+            fillObjectStorageByConnection(connection);
+            setAutofillModalOpen(false);
+          }}
+        />
+      ) : null}
     </>
   );
 };

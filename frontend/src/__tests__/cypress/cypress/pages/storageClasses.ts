@@ -12,6 +12,11 @@ class StorageClassesPage {
     this.wait();
   }
 
+  navigate() {
+    this.findNavItem().click();
+    this.wait();
+  }
+
   private wait() {
     cy.findByTestId('app-page-title').contains('Storage classes');
     cy.testA11y();
@@ -23,6 +28,10 @@ class StorageClassesPage {
 
   findEmptyState() {
     return cy.findByTestId('storage-classes-empty-state');
+  }
+
+  findNoDefaultAlert() {
+    return cy.findByTestId('no-default-storage-class-alert');
   }
 
   mockGetStorageClasses(storageClasses?: StorageClassKind[], times?: number) {

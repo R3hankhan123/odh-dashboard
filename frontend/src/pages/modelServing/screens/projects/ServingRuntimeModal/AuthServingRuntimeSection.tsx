@@ -11,28 +11,25 @@ import {
 } from '@patternfly/react-core';
 import { OutlinedQuestionCircleIcon } from '@patternfly/react-icons';
 import { UpdateObjectAtPropAndValue } from '~/pages/projects/types';
-import {
-  CreatingInferenceServiceObject,
-  CreatingServingRuntimeObject,
-} from '~/pages/modelServing/screens/types';
+import { CreatingModelServingObjectCommon } from '~/pages/modelServing/screens/types';
 
 import ServingRuntimeTokenSection from './ServingRuntimeTokenSection';
 
-type AuthServingRuntimeSectionProps = {
-  data: CreatingServingRuntimeObject | CreatingInferenceServiceObject;
-  setData:
-    | UpdateObjectAtPropAndValue<CreatingServingRuntimeObject>
-    | UpdateObjectAtPropAndValue<CreatingInferenceServiceObject>;
+type AuthServingRuntimeSectionProps<D extends CreatingModelServingObjectCommon> = {
+  data: D;
+  setData: UpdateObjectAtPropAndValue<D>;
   allowCreate: boolean;
   publicRoute?: boolean;
+  showModelRoute?: boolean;
 };
 
-const AuthServingRuntimeSection: React.FC<AuthServingRuntimeSectionProps> = ({
+const AuthServingRuntimeSection = <D extends CreatingModelServingObjectCommon>({
   data,
   setData,
   allowCreate,
   publicRoute,
-}) => {
+  showModelRoute = true,
+}: AuthServingRuntimeSectionProps<D>): React.ReactNode => {
   const createNewToken = React.useCallback(() => {
     const name = 'default-name';
     const duplicated = data.tokens.filter((token) => token.name === name);
@@ -90,14 +87,16 @@ const AuthServingRuntimeSection: React.FC<AuthServingRuntimeSectionProps> = ({
           </FormGroup>
         </StackItem>
       )}
-      <StackItem>
-        <ServingRuntimeTokenSection
-          data={data}
-          setData={setData}
-          allowCreate={allowCreate}
-          createNewToken={createNewToken}
-        />
-      </StackItem>
+      {showModelRoute && (
+        <StackItem>
+          <ServingRuntimeTokenSection
+            data={data}
+            setData={setData}
+            allowCreate={allowCreate}
+            createNewToken={createNewToken}
+          />
+        </StackItem>
+      )}
       {((publicRoute && data.externalRoute && !data.tokenAuth) ||
         (!publicRoute && !data.tokenAuth)) && (
         <StackItem>
@@ -109,6 +108,21 @@ const AuthServingRuntimeSection: React.FC<AuthServingRuntimeSectionProps> = ({
             title="Making models available by external routes without requiring authorization can lead to security vulnerabilities."
           />
         </StackItem>
+      )}
+      {publicRoute && data.externalRoute && !showModelRoute && (
+        <Alert
+          isInline
+          variant="warning"
+          title="Token authentication prerequisite not installed"
+          data-testid="token-authentication-prerequisite-alert"
+        >
+          <p>
+            Making models available through external routes without requiring token authentication
+            can lead to unauthorized access of your model. To enable token authentication, you must
+            first request that your cluster administrator install the Authorino operator on your
+            cluster.
+          </p>
+        </Alert>
       )}
     </Stack>
   );

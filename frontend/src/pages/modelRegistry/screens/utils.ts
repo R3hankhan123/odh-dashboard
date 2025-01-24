@@ -6,6 +6,7 @@ import {
   ModelVersion,
   RegisteredModel,
 } from '~/concepts/modelRegistry/types';
+import { ServiceKind } from '~/k8sTypes';
 import { KeyValuePair } from '~/types';
 
 // Retrieves the labels from customProperties that have non-empty string_value.
@@ -43,6 +44,12 @@ export const getProperties = <T extends ModelRegistryCustomProperties>(
 ): ModelRegistryStringCustomProperties => {
   const initial: ModelRegistryStringCustomProperties = {};
   return Object.keys(customProperties).reduce((acc, key) => {
+    // _lastModified is a property that is required to update the timestamp on the backend and we have a workaround for it. It should be resolved by
+    // backend team See https://issues.redhat.com/browse/RHOAIENG-17614 .
+    if (key === '_lastModified') {
+      return acc;
+    }
+
     const prop = customProperties[key];
     if (prop.metadataType === ModelRegistryMetadataType.STRING && prop.string_value !== '') {
       return { ...acc, [key]: prop };
@@ -79,8 +86,10 @@ export const filterModelVersions = (
   unfilteredModelVersions: ModelVersion[],
   search: string,
   searchType: SearchType,
-): ModelVersion[] =>
-  unfilteredModelVersions.filter((mv: ModelVersion) => {
+): ModelVersion[] => {
+  const searchLower = search.toLowerCase();
+
+  return unfilteredModelVersions.filter((mv: ModelVersion) => {
     if (!search) {
       return true;
     }
@@ -88,21 +97,20 @@ export const filterModelVersions = (
     switch (searchType) {
       case SearchType.KEYWORD:
         return (
-          mv.name.toLowerCase().includes(search.toLowerCase()) ||
-          (mv.description && mv.description.toLowerCase().includes(search.toLowerCase()))
+          mv.name.toLowerCase().includes(searchLower) ||
+          (mv.description && mv.description.toLowerCase().includes(searchLower)) ||
+          getLabels(mv.customProperties).some((label) => label.toLowerCase().includes(searchLower))
         );
 
-      case SearchType.AUTHOR:
-        return (
-          mv.author &&
-          (mv.author.toLowerCase().includes(search.toLowerCase()) ||
-            (mv.author && mv.author.toLowerCase().includes(search.toLowerCase())))
-        );
+      case SearchType.AUTHOR: {
+        return mv.author && mv.author.toLowerCase().includes(searchLower);
+      }
 
       default:
         return true;
     }
   });
+};
 
 export const sortModelVersionsByCreateTime = (registeredModels: ModelVersion[]): ModelVersion[] =>
   registeredModels.toSorted((a, b) => {
@@ -113,25 +121,45 @@ export const sortModelVersionsByCreateTime = (registeredModels: ModelVersion[]):
 
 export const filterRegisteredModels = (
   unfilteredRegisteredModels: RegisteredModel[],
+  unfilteredModelVersions: ModelVersion[],
   search: string,
   searchType: SearchType,
-): RegisteredModel[] =>
-  unfilteredRegisteredModels.filter((rm: RegisteredModel) => {
+): RegisteredModel[] => {
+  const searchLower = search.toLowerCase();
+
+  return unfilteredRegisteredModels.filter((rm: RegisteredModel) => {
     if (!search) {
       return true;
     }
+    const modelVersions = unfilteredModelVersions.filter((mv) => mv.registeredModelId === rm.id);
 
     switch (searchType) {
-      case SearchType.KEYWORD:
-        return (
-          rm.name.toLowerCase().includes(search.toLowerCase()) ||
-          (rm.description && rm.description.toLowerCase().includes(search.toLowerCase()))
+      case SearchType.KEYWORD: {
+        const matchesModel =
+          rm.name.toLowerCase().includes(searchLower) ||
+          (rm.description && rm.description.toLowerCase().includes(searchLower)) ||
+          getLabels(rm.customProperties).some((label) => label.toLowerCase().includes(searchLower));
+
+        const matchesVersion = modelVersions.some(
+          (mv: ModelVersion) =>
+            mv.name.toLowerCase().includes(searchLower) ||
+            (mv.description && mv.description.toLowerCase().includes(searchLower)) ||
+            getLabels(mv.customProperties).some((label) =>
+              label.toLowerCase().includes(searchLower),
+            ),
         );
 
-      case SearchType.OWNER:
-        return rm.owner && rm.owner.toLowerCase().includes(search.toLowerCase());
+        return matchesModel || matchesVersion;
+      }
+      case SearchType.OWNER: {
+        return rm.owner && rm.owner.toLowerCase().includes(searchLower);
+      }
 
       default:
         return true;
     }
   });
+};
+
+export const getServerAddress = (resource: ServiceKind): string =>
+  resource.metadata.annotations?.['routing.opendatahub.io/external-address-rest'] || '';

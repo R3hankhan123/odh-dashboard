@@ -42,6 +42,7 @@ const ServingRuntimeTable: React.FC = () => {
   return (
     <>
       <Table
+        variant="compact"
         data-testid="serving-runtime-table"
         data={modelServers}
         columns={columns}
@@ -59,7 +60,7 @@ const ServingRuntimeTable: React.FC = () => {
           />
         )}
       />
-      {allowDelete && (
+      {allowDelete && deleteServingRuntime ? (
         <DeleteServingRuntimeModal
           servingRuntime={deleteServingRuntime}
           inferenceServices={inferenceServices}
@@ -73,26 +74,26 @@ const ServingRuntimeTable: React.FC = () => {
             setDeleteServingRuntime(undefined);
           }}
         />
-      )}
-      <ManageServingRuntimeModal
-        isOpen={editServingRuntime !== undefined}
-        currentProject={currentProject}
-        editInfo={{
-          servingRuntime: editServingRuntime,
-          secrets: filterTokens(editServingRuntime?.metadata.name),
-        }}
-        onClose={(submit: boolean) => {
-          setEditServingRuntime(undefined);
-          if (submit) {
-            refreshServingRuntime();
-            refreshInferenceServices();
-            setTimeout(refreshTokens, 500); // need a timeout to wait for tokens creation
-          }
-        }}
-      />
+      ) : null}
+      {editServingRuntime ? (
+        <ManageServingRuntimeModal
+          currentProject={currentProject}
+          editInfo={{
+            servingRuntime: editServingRuntime,
+            secrets: filterTokens(editServingRuntime.metadata.name),
+          }}
+          onClose={(submit: boolean) => {
+            setEditServingRuntime(undefined);
+            if (submit) {
+              refreshServingRuntime();
+              refreshInferenceServices();
+              setTimeout(refreshTokens, 500); // need a timeout to wait for tokens creation
+            }
+          }}
+        />
+      ) : null}
       {deployServingRuntime && (
         <ManageInferenceServiceModal
-          isOpen={!!deployServingRuntime}
           onClose={(submit: boolean) => {
             setDeployServingRuntime(undefined);
             if (submit) {

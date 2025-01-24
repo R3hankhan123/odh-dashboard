@@ -10,9 +10,9 @@ import {
 } from '~/concepts/pipelines/content/createRun/types';
 import {
   DateTimeKF,
-  ExperimentKFv2,
-  PipelineRecurringRunKFv2,
-  PipelineRunKFv2,
+  ExperimentKF,
+  PipelineRecurringRunKF,
+  PipelineRunKF,
   RuntimeConfigParameters,
   StorageStateKF,
 } from '~/concepts/pipelines/kfTypes';
@@ -43,7 +43,7 @@ const parseKFTime = (kfTime?: DateTimeKF): RunDateTime | undefined => {
 
 const useUpdateRunType = (
   setFunction: UpdateObjectAtPropAndValue<RunFormData>,
-  initialData?: PipelineRunKFv2 | PipelineRecurringRunKFv2 | null,
+  initialData?: PipelineRunKF | PipelineRecurringRunKF | null,
 ): void => {
   React.useEffect(() => {
     if (!initialData || !isPipelineRecurringRun(initialData)) {
@@ -97,7 +97,7 @@ const useUpdateRunType = (
 
 const useUpdateExperimentFormData = (
   formState: GenericObjectState<RunFormData>,
-  experiment: ExperimentKFv2 | null | undefined,
+  experiment: ExperimentKF | null | undefined,
 ) => {
   const [formData, setFormValue] = formState;
 
@@ -116,35 +116,44 @@ const useUpdateExperimentFormData = (
   }, [formData.experiment, setFormValue, experiment, formData.runType.type]);
 };
 
-const useUpdateCloneData = (
+const useUpdateDuplicateData = (
   setFunction: UpdateObjectAtPropAndValue<RunFormData>,
-  initialData?: PipelineRunKFv2 | PipelineRecurringRunKFv2 | null,
+  initialData?: PipelineRunKF | PipelineRecurringRunKF | null,
 ) => {
-  const cloneRunPipelineId = initialData?.pipeline_version_reference?.pipeline_id || '';
-  const cloneRunVersionId = initialData?.pipeline_version_reference?.pipeline_version_id || '';
-  const cloneRunExperimentId = initialData?.experiment_id || '';
-  const [cloneRunPipelineVersion] = usePipelineVersionById(cloneRunPipelineId, cloneRunVersionId);
-  const [cloneRunPipeline] = usePipelineById(cloneRunPipelineId);
-  const [cloneExperiment] = useExperimentById(cloneRunExperimentId);
+  const duplicateRunPipelineId = initialData?.pipeline_version_reference?.pipeline_id || '';
+  const duplicateRunVersionId = initialData?.pipeline_version_reference?.pipeline_version_id || '';
+  const duplicateRunExperimentId = initialData?.experiment_id || '';
+  const [duplicateRunPipelineVersion] = usePipelineVersionById(
+    duplicateRunPipelineId,
+    duplicateRunVersionId,
+  );
+  const [duplicateRunPipeline] = usePipelineById(duplicateRunPipelineId);
+  const [duplicateExperiment] = useExperimentById(duplicateRunExperimentId);
 
   React.useEffect(() => {
     if (!initialData) {
       return;
     }
-    setFunction('experiment', cloneExperiment);
-    setFunction('pipeline', cloneRunPipeline);
-    setFunction('version', cloneRunPipelineVersion);
-  }, [setFunction, initialData, cloneExperiment, cloneRunPipeline, cloneRunPipelineVersion]);
+    setFunction('experiment', duplicateExperiment);
+    setFunction('pipeline', duplicateRunPipeline);
+    setFunction('version', duplicateRunPipelineVersion);
+  }, [
+    setFunction,
+    initialData,
+    duplicateExperiment,
+    duplicateRunPipeline,
+    duplicateRunPipelineVersion,
+  ]);
 };
 
 const useRunFormData = (
-  run?: PipelineRunKFv2 | PipelineRecurringRunKFv2 | null,
+  run?: PipelineRunKF | PipelineRecurringRunKF | null,
   initialFormData?: Partial<RunFormData>,
 ): GenericObjectState<RunFormData> => {
   const { project } = usePipelinesAPI();
   const { pipeline, version, experiment, nameDesc } = initialFormData || {};
 
-  const formState = useGenericObjectState<RunFormData>({
+  const formState = useGenericObjectState<RunFormData>(() => ({
     project,
     nameDesc: nameDesc ?? { name: '', description: '' },
     pipeline: pipeline ?? null,
@@ -161,12 +170,12 @@ const useRunFormData = (
         {},
       ),
     ...initialFormData,
-  });
+  }));
   const [, setFormValue] = formState;
 
   useUpdateExperimentFormData(formState, experiment);
   useUpdateRunType(setFormValue, run);
-  useUpdateCloneData(setFormValue, run);
+  useUpdateDuplicateData(setFormValue, run);
 
   return formState;
 };

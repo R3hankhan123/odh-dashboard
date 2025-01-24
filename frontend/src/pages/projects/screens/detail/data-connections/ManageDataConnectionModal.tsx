@@ -1,6 +1,7 @@
 import * as React from 'react';
 import * as _ from 'lodash-es';
-import { Alert, Button, Form, Modal, Stack, StackItem } from '@patternfly/react-core';
+import { Alert, Button, Form, Stack, StackItem } from '@patternfly/react-core';
+import { Modal } from '@patternfly/react-core/deprecated';
 import { K8sResourceCommon } from '@openshift/dynamic-plugin-sdk-utils';
 import AWSField from '~/pages/projects/dataConnections/AWSField';
 import { DataConnection, EnvVariableDataEntry } from '~/pages/projects/types';
@@ -23,12 +24,10 @@ import { convertAWSSecretData } from './utils';
 
 type ManageDataConnectionModalProps = {
   existingData?: DataConnection;
-  isOpen: boolean;
   onClose: (submitted: boolean) => void;
 };
 
 const ManageDataConnectionModal: React.FC<ManageDataConnectionModalProps> = ({
-  isOpen,
   onClose,
   existingData,
 }) => {
@@ -149,7 +148,7 @@ const ManageDataConnectionModal: React.FC<ManageDataConnectionModalProps> = ({
     <Modal
       title={existingData ? 'Edit data connection' : 'Add data connection'}
       variant="medium"
-      isOpen={isOpen}
+      isOpen
       onClose={() => onBeforeClose(false)}
       showClose
       actions={[

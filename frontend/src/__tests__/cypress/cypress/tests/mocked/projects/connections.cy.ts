@@ -58,11 +58,11 @@ describe('Connections', () => {
     const row1 = connectionsPage.getConnectionRow('test1');
     row1.find().findByText('test1').should('exist');
     row1.find().findByText('s3').should('exist');
-    row1.find().findByText('Model serving').should('exist');
+    row1.find().findByText('S3 compatible object storage').should('exist');
     const row2 = connectionsPage.getConnectionRow('test2');
     row2.find().findByText('test2').should('exist');
     row2.find().findByText('postgres').should('exist');
-    row1.find().findByText('Model serving').should('exist');
+    row2.find().findByText('S3 compatible object storage').should('not.exist');
   });
 
   it('Delete a connection', () => {
@@ -117,7 +117,23 @@ describe('Connections', () => {
     cy.findByTestId('connection-name-desc-name').fill('new connection');
     cy.findByTestId('modal-submit-button').click();
 
-    cy.wait('@createConnection');
+    cy.wait('@createConnection').then((interception) => {
+      expect(interception.request.body).to.eql({
+        apiVersion: 'v1',
+        kind: 'Secret',
+        metadata: {
+          annotations: {
+            'opendatahub.io/connection-type-ref': 'test',
+            'openshift.io/description': '',
+            'openshift.io/display-name': 'new connection',
+          },
+          labels: { 'opendatahub.io/dashboard': 'true' },
+          name: 'new-connection',
+          namespace: 'test-project',
+        },
+        stringData: {},
+      });
+    });
   });
 
   it('Edit a connection', () => {
@@ -146,9 +162,35 @@ describe('Connections', () => {
     projectDetails.visitSection('test-project', 'connections');
 
     connectionsPage.getConnectionRow('test2').findKebabAction('Edit').click();
-    cy.findByTestId(['field_env']).fill('new data');
+    cy.findByTestId(['field', 'field_env']).fill('new data');
     cy.findByTestId('modal-submit-button').click();
 
-    cy.wait('@editConnection');
+    cy.wait('@editConnection').then((interception) => {
+      expect(interception.request.body).to.eql({
+        apiVersion: 'v1',
+        kind: 'Secret',
+        metadata: {
+          annotations: {
+            'opendatahub.io/connection-type': 's3',
+            'opendatahub.io/connection-type-ref': 'postgres',
+            'openshift.io/description': '',
+            'openshift.io/display-name': 'test2',
+          },
+          labels: { 'opendatahub.io/dashboard': 'true', 'opendatahub.io/managed': 'true' },
+          name: 'test2',
+          namespace: 'test-project',
+        },
+        stringData: {
+          /* eslint-disable camelcase */
+          AWS_ACCESS_KEY_ID: 'sdsd',
+          AWS_SECRET_ACCESS_KEY: 'sdsd',
+          AWS_S3_ENDPOINT: 'https://s3.amazonaws.com/',
+          AWS_DEFAULT_REGION: 'us-east-1',
+          AWS_S3_BUCKET: 'test-bucket',
+          field_env: 'new data',
+          /* eslint-enable camelcase */
+        },
+      });
+    });
   });
 });

@@ -3,11 +3,8 @@ import {
   Bullseye,
   EmptyState,
   EmptyStateBody,
-  EmptyStateHeader,
-  EmptyStateIcon,
   EmptyStateVariant,
   PageSection,
-  PageSectionVariants,
   Spinner,
   Stack,
   StackItem,
@@ -25,29 +22,30 @@ import DashboardExpandableSection from '~/concepts/dashboard/DashboardExpandable
 import useBiasChartSelections from '~/pages/modelServing/screens/metrics/bias/useBiasChartSelections';
 import { ModelMetricType } from '~/pages/modelServing/screens/metrics/ModelServingMetricsContext';
 import EnsureMetricsAvailable from '~/pages/modelServing/screens/metrics/EnsureMetricsAvailable';
+import { TrustyInstallState } from '~/concepts/trustyai/types';
 
 const OPEN_WRAPPER_STORAGE_KEY_PREFIX = `odh.dashboard.xai.bias_metric_chart_wrapper_open`;
 const BiasTab: React.FC = () => {
-  const { biasMetricConfigs, loaded, loadError } = useModelBiasData();
+  const { biasMetricConfigs, statusState } = useModelBiasData();
 
   const [selectedBiasConfigs, setSelectedBiasConfigs, settled] =
     useBiasChartSelections(biasMetricConfigs);
 
-  const ready = loaded && settled;
+  const ready = statusState.type === TrustyInstallState.INSTALLED && settled;
 
-  if (loadError) {
+  if (statusState.type === TrustyInstallState.CR_ERROR) {
     return (
-      <PageSection isFilled variant={PageSectionVariants.light}>
-        <EmptyState variant={EmptyStateVariant.lg}>
-          <EmptyStateHeader
-            titleText="TrustyAI Error"
-            icon={<EmptyStateIcon icon={ExclamationCircleIcon} />}
-            headingLevel="h5"
-          />
+      <PageSection hasBodyWrapper={false} isFilled>
+        <EmptyState
+          headingLevel="h5"
+          icon={ExclamationCircleIcon}
+          titleText="TrustyAI Error"
+          variant={EmptyStateVariant.lg}
+        >
           <EmptyStateBody>
             <Stack hasGutter>
               <StackItem>We encountered an error accessing the TrustyAI service:</StackItem>
-              <StackItem>{loadError.message}</StackItem>
+              <StackItem>{statusState.message}</StackItem>
             </Stack>
           </EmptyStateBody>
         </EmptyState>
@@ -72,24 +70,26 @@ const BiasTab: React.FC = () => {
         <StackItem>
           <MetricsPageToolbar
             leftToolbarItem={
-              <ToolbarGroup>
-                <Stack>
-                  {/* Will be fixed by https://issues.redhat.com/browse/RHOAIENG-2403 */}
-                  <StackItem style={{ fontWeight: 'bold' }}>Metrics to display</StackItem>
-                  <StackItem>
-                    <ToolbarItem data-testid="bias-metric-config-toolbar">
-                      <BiasMetricConfigSelector
-                        onChange={setSelectedBiasConfigs}
-                        initialSelections={selectedBiasConfigs}
-                      />
-                    </ToolbarItem>
-                  </StackItem>
-                </Stack>
-              </ToolbarGroup>
+              biasMetricConfigs.length > 0 ? (
+                <ToolbarGroup>
+                  <Stack>
+                    {/* Will be fixed by https://issues.redhat.com/browse/RHOAIENG-2403 */}
+                    <StackItem style={{ fontWeight: 'bold' }}>Metrics to display</StackItem>
+                    <StackItem>
+                      <ToolbarItem data-testid="bias-metric-config-toolbar">
+                        <BiasMetricConfigSelector
+                          onChange={setSelectedBiasConfigs}
+                          initialSelections={selectedBiasConfigs}
+                        />
+                      </ToolbarItem>
+                    </StackItem>
+                  </Stack>
+                </ToolbarGroup>
+              ) : undefined
             }
           />
         </StackItem>
-        <PageSection isFilled>
+        <PageSection hasBodyWrapper={false} isFilled>
           <Stack hasGutter>
             {biasMetricConfigs.length === 0 ? (
               <StackItem>

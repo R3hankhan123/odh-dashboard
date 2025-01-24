@@ -8,7 +8,6 @@ import {
 } from '~/pages/modelServing/screens/types';
 import SimpleSelect from '~/components/SimpleSelect';
 import { fetchNIMModelNames, ModelInfo } from '~/pages/modelServing/screens/projects/utils';
-import { useDashboardNamespace } from '~/redux/selectors';
 
 type NIMModelListSectionProps = {
   inferenceServiceData: CreatingInferenceServiceObject;
@@ -25,35 +24,43 @@ const NIMModelListSection: React.FC<NIMModelListSectionProps> = ({
 }) => {
   const [options, setOptions] = useState<{ key: string; label: string }[]>([]);
   const [modelList, setModelList] = useState<ModelInfo[]>([]);
-  const { dashboardNamespace } = useDashboardNamespace();
   const [error, setError] = useState<string>('');
-  const [selectedModel, setSelectedModel] = useState('');
+  const [selectedModel, setSelectedModel] = useState(
+    isEditing ? `${inferenceServiceData.format.name}` : '',
+  );
 
   useEffect(() => {
-    const getModelNames = async () => {
-      try {
-        const modelInfos = await fetchNIMModelNames(dashboardNamespace);
-        if (modelInfos && modelInfos.length > 0) {
-          const fetchedOptions = modelInfos.flatMap((modelInfo) =>
-            modelInfo.tags.map((tag) => ({
-              key: `${modelInfo.name}-${tag}`,
-              label: `${modelInfo.displayName} - ${tag}`,
-            })),
-          );
-          setModelList(modelInfos);
-          setOptions(fetchedOptions);
-          setError('');
-        } else {
-          setError('No NVIDIA NIM models found. Please check the installation.');
+    if (!isEditing) {
+      const getModelNames = async () => {
+        try {
+          const modelInfos = await fetchNIMModelNames();
+          if (modelInfos && modelInfos.length > 0) {
+            const fetchedOptions = modelInfos.flatMap((modelInfo) =>
+              modelInfo.tags.map((tag) => ({
+                key: `${modelInfo.name}-${tag}`,
+                label: `${modelInfo.displayName} - ${tag}`,
+              })),
+            );
+            setModelList(modelInfos);
+            setOptions(fetchedOptions);
+            setError('');
+          } else {
+            setError('No NVIDIA NIM models found. Please check the installation.');
+            setOptions([]);
+          }
+        } catch (err) {
+          setError('There was a problem fetching the NIM models. Please try again later.');
           setOptions([]);
         }
-      } catch (err) {
-        setError('There was a problem fetching the NIM models. Please try again later.');
-        setOptions([]);
-      }
-    };
-    getModelNames();
-  }, [dashboardNamespace]);
+      };
+      getModelNames();
+    } else {
+      setOptions([
+        { key: inferenceServiceData.format.name, label: inferenceServiceData.format.name },
+      ]);
+      setSelectedModel(inferenceServiceData.format.name);
+    }
+  }, [isEditing, inferenceServiceData.format.name]);
 
   const getSupportedModelFormatsInfo = (key: string) => {
     const lastHyphenIndex = key.lastIndexOf('-');
@@ -87,7 +94,7 @@ const NIMModelListSection: React.FC<NIMModelListSectionProps> = ({
       <SimpleSelect
         isScrollable
         isFullWidth
-        isDisabled={isEditing || options.length === 0}
+        isDisabled={isEditing}
         id="nim-model-list-selection"
         dataTestId="nim-model-list-selection"
         aria-label="Select NVIDIA NIM to deploy"
@@ -96,20 +103,22 @@ const NIMModelListSection: React.FC<NIMModelListSectionProps> = ({
           options.length === 0
             ? 'No NIM models available'
             : isEditing
-            ? inferenceServiceData.name
+            ? inferenceServiceData.format.name
             : 'Select NVIDIA NIM to deploy'
         }
         value={selectedModel}
         onChange={(key) => {
-          setSelectedModel(key);
-          const supportedModelInfo = getSupportedModelFormatsInfo(key);
-          if (supportedModelInfo) {
-            setServingRuntimeData('supportedModelFormatsInfo', supportedModelInfo);
-            setServingRuntimeData('imageName', getNIMImageName(key));
-            setInferenceServiceData('format', { name: supportedModelInfo.name });
-            setError('');
-          } else {
-            setError('Error: Model not found.');
+          if (!isEditing) {
+            setSelectedModel(key);
+            const supportedModelInfo = getSupportedModelFormatsInfo(key);
+            if (supportedModelInfo) {
+              setServingRuntimeData('supportedModelFormatsInfo', supportedModelInfo);
+              setServingRuntimeData('imageName', getNIMImageName(key));
+              setInferenceServiceData('format', { name: supportedModelInfo.name });
+              setError('');
+            } else {
+              setError('Error: Model not found.');
+            }
           }
         }}
       />

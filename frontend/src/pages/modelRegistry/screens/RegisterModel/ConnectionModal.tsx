@@ -1,20 +1,20 @@
 import React from 'react';
-import { Modal, Button, FormGroup, HelperText, Form, FormHelperText } from '@patternfly/react-core';
+import { Button, FormGroup, HelperText, Form, FormHelperText } from '@patternfly/react-core';
+import { Modal } from '@patternfly/react-core/deprecated';
 import ProjectSelector from '~/concepts/projects/ProjectSelector';
 import { DataConnection } from '~/pages/projects/types';
 import { ConnectionDropdown } from './ConnectionDropdown';
 
 export const ConnectionModal: React.FC<{
-  isOpen: boolean;
   onClose: () => void;
   onSubmit: (connection: DataConnection) => void;
-}> = ({ isOpen = false, onClose, onSubmit }) => {
+}> = ({ onClose, onSubmit }) => {
   const [project, setProject] = React.useState<string | undefined>(undefined);
   const [connection, setConnection] = React.useState<DataConnection | undefined>(undefined);
 
   return (
     <Modal
-      isOpen={isOpen}
+      isOpen
       data-testid="connection-autofill-modal"
       variant="medium"
       title="Autofill from data connection"

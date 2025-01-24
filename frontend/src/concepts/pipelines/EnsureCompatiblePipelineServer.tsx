@@ -4,28 +4,26 @@ import {
   EmptyStateVariant,
   Bullseye,
   Spinner,
-  EmptyStateHeader,
-  EmptyStateActions,
-  EmptyStateFooter,
   EmptyStateBody,
-  Button,
-  EmptyStateIcon,
+  ButtonVariant,
 } from '@patternfly/react-core';
 import { ExclamationTriangleIcon } from '@patternfly/react-icons';
 import ExternalLink from '~/components/ExternalLink';
 import NoPipelineServer from '~/concepts/pipelines/NoPipelineServer';
+import { ODH_PRODUCT_NAME } from '~/utilities/const';
 import { DeleteServerModal, usePipelinesAPI } from './context';
 
-// TODO: Fix doc link to go to more docs on v2
 const DOCS_LINK =
-  'https://access.redhat.com/documentation/en-us/red_hat_openshift_ai_self-managed/2.7/html/release_notes/support-removals_relnotes';
+  'https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/2-latest/html/release_notes/support-removals_relnotes';
 
 type EnsureCompatiblePipelineServerProps = {
   children: React.ReactNode;
+  emptyStateVariant?: EmptyStateVariant;
 };
 
 const EnsureCompatiblePipelineServer: React.FC<EnsureCompatiblePipelineServerProps> = ({
   children,
+  emptyStateVariant = EmptyStateVariant.lg,
 }) => {
   const { pipelinesServer } = usePipelinesAPI();
   const [isDeleting, setIsDeleting] = React.useState(false);
@@ -39,49 +37,32 @@ const EnsureCompatiblePipelineServer: React.FC<EnsureCompatiblePipelineServerPro
   }
 
   if (!pipelinesServer.installed) {
-    return <NoPipelineServer variant="secondary" />;
+    return <NoPipelineServer variant={ButtonVariant.primary} />;
   }
 
   if (!pipelinesServer.compatible) {
     return (
       <>
         <Bullseye data-testid="incompatible-pipelines-server">
-          <EmptyState variant={EmptyStateVariant.lg}>
-            <EmptyStateHeader
-              titleText="Pipeline version cannot be rendered"
-              icon={
-                <EmptyStateIcon
-                  color="var(--pf-v5-global--warning-color--100)"
-                  icon={ExclamationTriangleIcon}
-                />
-              }
-            />
+          <EmptyState
+            data-testid="incompatible-pipelines-server-title"
+            icon={ExclamationTriangleIcon}
+            titleText="Unsupported pipeline and pipeline server version"
+            variant={emptyStateVariant}
+          >
             <EmptyStateBody>
               <p>
-                Rendering of this pipeline version in the UI is no longer supported, but it can
-                still be accessed via the API or OpenShift Console. To remove unsupported versions,
-                delete this project&apos;s pipeline server and create a new one.
+                This project contains v1 pipeline resources, which are no longer supported or
+                managed by {ODH_PRODUCT_NAME}. To proceed, back up your pipelines data, delete the
+                pipeline server, then create a new one. Alternatively, create a new project and
+                pipeline server. <ExternalLink text="View the documentation" to={DOCS_LINK} /> to
+                learn more about the migration process, server deletion, supported versions, and
+                data recovery.
               </p>
-              <ExternalLink
-                text="Learn more about supported versions and data recovery"
-                to={DOCS_LINK}
-              />
             </EmptyStateBody>
-
-            <EmptyStateFooter>
-              <EmptyStateActions>
-                <Button
-                  data-testid="delete-pipeline-server-button"
-                  variant="primary"
-                  onClick={() => setIsDeleting(true)}
-                >
-                  Delete pipeline server
-                </Button>
-              </EmptyStateActions>
-            </EmptyStateFooter>
           </EmptyState>
         </Bullseye>
-        <DeleteServerModal isOpen={isDeleting} onClose={() => setIsDeleting(false)} />
+        {isDeleting ? <DeleteServerModal onClose={() => setIsDeleting(false)} /> : null}
       </>
     );
   }

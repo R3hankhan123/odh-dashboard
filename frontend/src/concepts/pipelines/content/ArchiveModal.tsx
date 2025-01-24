@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Flex, FlexItem, Modal, Stack, StackItem, TextInput } from '@patternfly/react-core';
+import { Flex, FlexItem, Stack, StackItem, TextInput } from '@patternfly/react-core';
+import { Modal } from '@patternfly/react-core/deprecated';
 import { usePipelinesAPI } from '~/concepts/pipelines/context';
 import DashboardModalFooter from '~/concepts/dashboard/DashboardModalFooter';
 
@@ -10,7 +11,6 @@ interface ArchiveModalProps {
   onCancel: () => void;
   onSubmit: () => Promise<void[]>;
   children: React.ReactNode;
-  isOpen: boolean;
   testId: string;
 }
 
@@ -21,7 +21,6 @@ export const ArchiveModal: React.FC<ArchiveModalProps> = ({
   title,
   alertTitle,
   children,
-  isOpen,
   testId,
 }) => {
   const { refreshAllAPI } = usePipelinesAPI();
@@ -53,7 +52,7 @@ export const ArchiveModal: React.FC<ArchiveModalProps> = ({
 
   return (
     <Modal
-      isOpen={isOpen}
+      isOpen
       title={title}
       titleIconVariant="warning"
       variant="small"

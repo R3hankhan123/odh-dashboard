@@ -2,13 +2,15 @@ import * as React from 'react';
 import ManageInferenceServiceModal from '~/pages/modelServing/screens/projects/InferenceServiceModal/ManageInferenceServiceModal';
 import { SortableData, Table } from '~/components/table';
 import { InferenceServiceKind, ProjectKind, SecretKind, ServingRuntimeKind } from '~/k8sTypes';
-import { ProjectsContext } from '~/concepts/projects/ProjectsContext';
+import { byName, ProjectsContext } from '~/concepts/projects/ProjectsContext';
 import DashboardEmptyTableView from '~/concepts/dashboard/DashboardEmptyTableView';
 import { isModelMesh } from '~/pages/modelServing/utils';
 import ManageKServeModal from '~/pages/modelServing/screens/projects/kServeModal/ManageKServeModal';
 import ResourceTr from '~/components/ResourceTr';
 import { fireFormTrackingEvent } from '~/concepts/analyticsTracking/segmentIOUtils';
 import { TrackingOutcome } from '~/concepts/analyticsTracking/trackingProperties';
+import { isProjectNIMSupported } from '~/pages/modelServing/screens/projects/nimUtils';
+import ManageNIMServingModal from '~/pages/modelServing/screens/projects/NIMServiceModal/ManageNIMServingModal';
 import InferenceServiceTableRow from './InferenceServiceTableRow';
 import { getGlobalInferenceServiceColumns, getProjectInferenceServiceColumns } from './data';
 import DeleteInferenceServiceModal from './DeleteInferenceServiceModal';
@@ -40,6 +42,8 @@ const InferenceServiceTable: React.FC<InferenceServiceTableProps> = ({
   const [deleteInferenceService, setDeleteInferenceService] =
     React.useState<InferenceServiceKind>();
   const [editInferenceService, setEditInferenceService] = React.useState<InferenceServiceKind>();
+  const project = projects.find(byName(inferenceServices[0]?.metadata.namespace)) ?? null;
+  const isKServeNIMEnabled = !!project && isProjectNIMSupported(project);
   const mappedColumns = React.useMemo(() => {
     const columns = getColumns?.(projects);
 
@@ -53,6 +57,8 @@ const InferenceServiceTable: React.FC<InferenceServiceTableProps> = ({
 
     return getProjectInferenceServiceColumns();
   }, [getColumns, isGlobal, projects]);
+
+  const KServeManageModalComponent = isKServeNIMEnabled ? ManageNIMServingModal : ManageKServeModal;
 
   return (
     <>
@@ -82,62 +88,63 @@ const InferenceServiceTable: React.FC<InferenceServiceTableProps> = ({
           </ResourceTr>
         )}
       />
-      <DeleteInferenceServiceModal
-        isOpen={!!deleteInferenceService}
-        inferenceService={deleteInferenceService}
-        servingRuntime={
-          deleteInferenceService && !isModelMesh(deleteInferenceService)
-            ? servingRuntimes.find(
-                (sr) => sr.metadata.name === deleteInferenceService.spec.predictor.model?.runtime,
-              )
-            : undefined
-        }
-        onClose={(deleted) => {
-          fireFormTrackingEvent('Model Deleted', {
-            outcome: deleted ? TrackingOutcome.submit : TrackingOutcome.cancel,
-            type: 'multi',
-          });
-          if (deleted) {
-            refresh?.();
-          }
-          setDeleteInferenceService(undefined);
-        }}
-      />
-      <ManageInferenceServiceModal
-        isOpen={!!editInferenceService && isModelMesh(editInferenceService)}
-        editInfo={editInferenceService}
-        onClose={(edited) => {
-          fireFormTrackingEvent('Model Updated', {
-            outcome: edited ? TrackingOutcome.submit : TrackingOutcome.cancel,
-            type: 'multi',
-          });
-          if (edited) {
-            refresh?.();
-          }
-          setEditInferenceService(undefined);
-        }}
-      />
-      <ManageKServeModal
-        isOpen={!!editInferenceService && !isModelMesh(editInferenceService)}
-        editInfo={{
-          inferenceServiceEditInfo: editInferenceService,
-          servingRuntimeEditInfo: {
-            servingRuntime: editInferenceService
+      {deleteInferenceService ? (
+        <DeleteInferenceServiceModal
+          inferenceService={deleteInferenceService}
+          servingRuntime={
+            !isModelMesh(deleteInferenceService)
               ? servingRuntimes.find(
-                  (sr) => sr.metadata.name === editInferenceService.spec.predictor.model?.runtime,
+                  (sr) => sr.metadata.name === deleteInferenceService.spec.predictor.model?.runtime,
                 )
-              : undefined,
-            secrets: [],
-          },
-          secrets: filterTokens ? filterTokens(editInferenceService?.metadata.name) : [],
-        }}
-        onClose={(edited) => {
-          if (edited) {
-            refresh?.();
+              : undefined
           }
-          setEditInferenceService(undefined);
-        }}
-      />
+          onClose={(deleted) => {
+            fireFormTrackingEvent('Model Deleted', {
+              outcome: deleted ? TrackingOutcome.submit : TrackingOutcome.cancel,
+              type: 'multi',
+            });
+            if (deleted) {
+              refresh?.();
+            }
+            setDeleteInferenceService(undefined);
+          }}
+        />
+      ) : null}
+      {!!editInferenceService && isModelMesh(editInferenceService) ? (
+        <ManageInferenceServiceModal
+          editInfo={editInferenceService}
+          onClose={(edited) => {
+            fireFormTrackingEvent('Model Updated', {
+              outcome: edited ? TrackingOutcome.submit : TrackingOutcome.cancel,
+              type: 'multi',
+            });
+            if (edited) {
+              refresh?.();
+            }
+            setEditInferenceService(undefined);
+          }}
+        />
+      ) : null}
+      {!!editInferenceService && !isModelMesh(editInferenceService) ? (
+        <KServeManageModalComponent
+          editInfo={{
+            inferenceServiceEditInfo: editInferenceService,
+            servingRuntimeEditInfo: {
+              servingRuntime: servingRuntimes.find(
+                (sr) => sr.metadata.name === editInferenceService.spec.predictor.model?.runtime,
+              ),
+              secrets: [],
+            },
+            secrets: filterTokens ? filterTokens(editInferenceService.metadata.name) : [],
+          }}
+          onClose={(edited) => {
+            if (edited) {
+              refresh?.();
+            }
+            setEditInferenceService(undefined);
+          }}
+        />
+      ) : null}
     </>
   );
 };

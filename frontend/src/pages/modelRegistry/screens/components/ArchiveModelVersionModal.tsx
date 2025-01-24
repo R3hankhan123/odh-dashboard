@@ -1,19 +1,18 @@
 import * as React from 'react';
-import { Flex, FlexItem, Modal, Stack, StackItem, TextInput } from '@patternfly/react-core';
+import { Flex, FlexItem, Stack, StackItem, TextInput } from '@patternfly/react-core';
+import { Modal } from '@patternfly/react-core/deprecated';
 import DashboardModalFooter from '~/concepts/dashboard/DashboardModalFooter';
 import useNotification from '~/utilities/useNotification';
 
 interface ArchiveModelVersionModalProps {
   onCancel: () => void;
   onSubmit: () => void;
-  isOpen: boolean;
   modelVersionName: string;
 }
 
 export const ArchiveModelVersionModal: React.FC<ArchiveModelVersionModalProps> = ({
   onCancel,
   onSubmit,
-  isOpen,
   modelVersionName,
 }) => {
   const notification = useNotification();
@@ -45,8 +44,8 @@ export const ArchiveModelVersionModal: React.FC<ArchiveModelVersionModalProps> =
 
   return (
     <Modal
-      isOpen={isOpen}
-      title="Archive version?"
+      isOpen
+      title="Archive model version?"
       titleIconVariant="warning"
       variant="small"
       onClose={onClose}

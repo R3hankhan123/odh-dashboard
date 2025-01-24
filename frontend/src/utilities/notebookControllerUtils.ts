@@ -1,11 +1,10 @@
 import * as React from 'react';
 import { AxiosError } from 'axios';
+import { K8sResourceCommon } from '@openshift/dynamic-plugin-sdk-utils';
 import { createRoleBinding, getRoleBinding } from '~/services/roleBindingService';
 import {
   EnvVarReducedTypeKeyValues,
   EventStatus,
-  K8sEvent,
-  K8sResourceCommon,
   Notebook,
   NotebookControllerUserState,
   NotebookStatus,
@@ -19,8 +18,8 @@ import { EMPTY_USER_STATE } from '~/pages/notebookController/const';
 import useNamespaces from '~/pages/notebookController/useNamespaces';
 import { useAppContext } from '~/app/AppContext';
 import { getRoute } from '~/services/routeService';
-import { RoleBindingKind } from '~/k8sTypes';
-import { useWatchNotebookEvents } from './useWatchNotebookEvents';
+import { EventKind, RoleBindingKind } from '~/k8sTypes';
+import { useWatchNotebookEvents } from '~/api';
 import { useDeepCompareMemoize } from './useDeepCompareMemoize';
 
 export const usernameTranslate = (username: string): string => {
@@ -236,13 +235,13 @@ export const useNotebookRedirectLink = (): (() => Promise<string>) => {
   }, [notebookNamespace, routeName, currentUserNotebookLink]);
 };
 
-export const getEventTimestamp = (event: K8sEvent): string =>
+export const getEventTimestamp = (event: EventKind): string =>
   event.lastTimestamp || event.eventTime;
 
 const filterEvents = (
-  allEvents: K8sEvent[],
+  allEvents: EventKind[],
   lastActivity: Date,
-): [filterEvents: K8sEvent[], thisInstanceEvents: K8sEvent[], gracePeroid: boolean] => {
+): [filterEvents: EventKind[], thisInstanceEvents: EventKind[], gracePeroid: boolean] => {
   const thisInstanceEvents = allEvents
     .filter((event) => new Date(getEventTimestamp(event)) >= lastActivity)
     .toSorted((a, b) => getEventTimestamp(a).localeCompare(getEventTimestamp(b)));
@@ -289,13 +288,11 @@ const filterEvents = (
   return [filteredEvents, thisInstanceEvents, gracePeriod];
 };
 
-const useLastActivity = (storeValue: boolean, annotationValue?: string): Date | null => {
+const useLastActivity = (annotationValue?: string): Date | null => {
   const lastOpenActivity = React.useRef<Date | null>(null);
 
-  if (storeValue && annotationValue && !lastOpenActivity.current) {
+  if (annotationValue && !lastOpenActivity.current) {
     lastOpenActivity.current = new Date(annotationValue);
-  } else if (!storeValue && lastOpenActivity.current) {
-    lastOpenActivity.current = null;
   }
 
   return lastOpenActivity.current;
@@ -303,25 +300,21 @@ const useLastActivity = (storeValue: boolean, annotationValue?: string): Date | 
 
 export const useNotebookStatus = (
   spawnInProgress: boolean,
-  open: boolean,
-): [status: NotebookStatus | null, events: K8sEvent[]] => {
+): [status: NotebookStatus | null, events: EventKind[]] => {
   const {
     currentUserNotebook: notebook,
     currentUserNotebookIsRunning: isNotebookRunning,
     currentUserNotebookPodUID,
   } = React.useContext(NotebookControllerContext);
 
-  const events = useWatchNotebookEvents(
-    notebook,
+  const [events] = useWatchNotebookEvents(
+    notebook?.metadata.namespace ?? '',
+    notebook?.metadata.name ?? '',
     currentUserNotebookPodUID,
-    spawnInProgress && !isNotebookRunning,
   );
 
   const lastActivity =
-    useLastActivity(
-      open,
-      notebook?.metadata.annotations?.['notebooks.kubeflow.org/last-activity'],
-    ) ||
+    useLastActivity(notebook?.metadata.annotations?.['notebooks.kubeflow.org/last-activity']) ||
     (notebook && (spawnInProgress || isNotebookRunning)
       ? new Date(notebook.metadata.creationTimestamp ?? 0)
       : null);
@@ -434,6 +427,9 @@ export const useNotebookStatus = (
       default: {
         if (!gracePeriod && lastItem.reason === 'FailedScheduling') {
           currentEvent = 'Insufficient resources to start';
+          status = EventStatus.ERROR;
+        } else if (!gracePeriod && lastItem.reason === 'BackOff') {
+          currentEvent = 'ImagePullBackOff';
           status = EventStatus.ERROR;
         } else if (lastItem.type === 'Warning') {
           currentEvent = 'Issue creating notebook container';

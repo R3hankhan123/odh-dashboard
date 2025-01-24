@@ -3,7 +3,7 @@ import { SearchInput, ToolbarFilter, ToolbarGroup, ToolbarItem } from '@patternf
 import { FilterIcon } from '@patternfly/react-icons';
 import { useNavigate } from 'react-router';
 import { SearchType } from '~/concepts/dashboard/DashboardSearchField';
-import { RegisteredModel } from '~/concepts/modelRegistry/types';
+import { ModelVersion, RegisteredModel } from '~/concepts/modelRegistry/types';
 import SimpleSelect from '~/components/SimpleSelect';
 import { filterRegisteredModels } from '~/pages/modelRegistry/screens/utils';
 import { ModelRegistrySelectorContext } from '~/concepts/modelRegistry/context/ModelRegistrySelectorContext';
@@ -14,23 +14,27 @@ import {
 } from '~/pages/modelRegistry/screens/routeUtils';
 import { asEnumMember } from '~/utilities/utils';
 import { ProjectObjectType, typedEmptyImage } from '~/concepts/design/utils';
+import { filterArchiveModels, filterLiveModels } from '~/concepts/modelRegistry/utils';
 import RegisteredModelTable from './RegisteredModelTable';
 import RegisteredModelsTableToolbar from './RegisteredModelsTableToolbar';
 
 type RegisteredModelListViewProps = {
   registeredModels: RegisteredModel[];
+  modelVersions: ModelVersion[];
   refresh: () => void;
 };
 
 const RegisteredModelListView: React.FC<RegisteredModelListViewProps> = ({
-  registeredModels: unfilteredRegisteredModels,
+  registeredModels,
+  modelVersions,
   refresh,
 }) => {
   const navigate = useNavigate();
   const { preferredModelRegistry } = React.useContext(ModelRegistrySelectorContext);
   const [searchType, setSearchType] = React.useState<SearchType>(SearchType.KEYWORD);
   const [search, setSearch] = React.useState('');
-
+  const unfilteredRegisteredModels = filterLiveModels(registeredModels);
+  const archiveRegisteredModels = filterArchiveModels(registeredModels);
   const searchTypes = React.useMemo(() => [SearchType.KEYWORD, SearchType.OWNER], []);
 
   if (unfilteredRegisteredModels.length === 0) {
@@ -44,9 +48,13 @@ const RegisteredModelListView: React.FC<RegisteredModelListViewProps> = ({
             alt="missing model"
           />
         )}
-        description={`${preferredModelRegistry?.metadata.name} has no active registered models. Register a model in this registry, or select a different registry.`}
+        description={`${
+          preferredModelRegistry?.metadata.name ?? ''
+        } has no active registered models. Register a model in this registry, or select a different registry.`}
         primaryActionText="Register model"
-        secondaryActionText="View archived models"
+        secondaryActionText={
+          archiveRegisteredModels.length !== 0 ? 'View archived models' : undefined
+        }
         primaryActionOnClick={() => {
           navigate(registerModelUrl(preferredModelRegistry?.metadata.name));
         }}
@@ -59,6 +67,7 @@ const RegisteredModelListView: React.FC<RegisteredModelListViewProps> = ({
 
   const filteredRegisteredModels = filterRegisteredModels(
     unfilteredRegisteredModels,
+    modelVersions,
     search,
     searchType,
   );
@@ -70,9 +79,9 @@ const RegisteredModelListView: React.FC<RegisteredModelListViewProps> = ({
   const toggleGroupItems = (
     <ToolbarGroup variant="filter-group">
       <ToolbarFilter
-        chips={search === '' ? [] : [search]}
-        deleteChip={() => setSearch('')}
-        deleteChipGroup={() => setSearch('')}
+        labels={search === '' ? [] : [search]}
+        deleteLabel={resetFilters}
+        deleteLabelGroup={resetFilters}
         categoryName="Keyword"
       >
         <SimpleSelect
@@ -90,14 +99,14 @@ const RegisteredModelListView: React.FC<RegisteredModelListViewProps> = ({
           icon={<FilterIcon />}
         />
       </ToolbarFilter>
-      <ToolbarItem variant="search-filter">
+      <ToolbarItem>
         <SearchInput
           placeholder={`Find by ${searchType.toLowerCase()}`}
           value={search}
           onChange={(_, searchValue) => {
             setSearch(searchValue);
           }}
-          onClear={() => setSearch('')}
+          onClear={resetFilters}
           style={{ minWidth: '200px' }}
           data-testid="registered-model-table-search"
         />
@@ -110,7 +119,12 @@ const RegisteredModelListView: React.FC<RegisteredModelListViewProps> = ({
       refresh={refresh}
       clearFilters={resetFilters}
       registeredModels={filteredRegisteredModels}
-      toolbarContent={<RegisteredModelsTableToolbar toggleGroupItems={toggleGroupItems} />}
+      toolbarContent={
+        <RegisteredModelsTableToolbar
+          toggleGroupItems={toggleGroupItems}
+          onClearAllFilters={resetFilters}
+        />
+      }
     />
   );
 };

@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { ButtonVariant } from '@patternfly/react-core';
 import ApplicationsPage from '~/pages/ApplicationsPage';
 import NoPipelineServer from '~/concepts/pipelines/NoPipelineServer';
 import PipelineCoreProjectSelector from '~/pages/pipelines/global/PipelineCoreProjectSelector';
@@ -19,18 +20,22 @@ const PipelineCoreApplicationPage: React.FC<PipelineCoreApplicationPageProps> = 
   overrideChildPadding,
   ...pageProps
 }) => {
-  const pipelinesAPi = usePipelinesAPI();
+  const { pipelinesServer } = usePipelinesAPI();
 
   return (
     <ApplicationsPage
       {...pageProps}
-      loaded={!pipelinesAPi.pipelinesServer.initializing}
-      empty={!pipelinesAPi.pipelinesServer.installed}
-      emptyStatePage={<NoPipelineServer />}
+      loaded={!pipelinesServer.initializing}
+      empty={!pipelinesServer.installed}
+      emptyStatePage={<NoPipelineServer variant={ButtonVariant.primary} />}
       headerContent={<PipelineCoreProjectSelector getRedirectPath={getRedirectPath} />}
       provideChildrenPadding={!overrideChildPadding}
     >
-      {pipelinesAPi.pipelinesServer.timedOut ? <PipelineServerTimedOut /> : children}
+      {pipelinesServer.timedOut && pipelinesServer.compatible ? (
+        <PipelineServerTimedOut />
+      ) : (
+        children
+      )}
     </ApplicationsPage>
   );
 };

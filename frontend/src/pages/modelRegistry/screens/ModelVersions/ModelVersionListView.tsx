@@ -31,21 +31,27 @@ import {
 } from '~/pages/modelRegistry/screens/routeUtils';
 import { asEnumMember } from '~/utilities/utils';
 import { ProjectObjectType, typedEmptyImage } from '~/concepts/design/utils';
+import { filterArchiveVersions, filterLiveVersions } from '~/concepts/modelRegistry/utils';
 import ModelVersionsTable from './ModelVersionsTable';
 
 type ModelVersionListViewProps = {
   modelVersions: ModelVersion[];
-  registeredModel?: RegisteredModel;
+  registeredModel: RegisteredModel;
   isArchiveModel?: boolean;
   refresh: () => void;
 };
 
 const ModelVersionListView: React.FC<ModelVersionListViewProps> = ({
-  modelVersions: unfilteredModelVersions,
+  modelVersions,
   registeredModel: rm,
   isArchiveModel,
   refresh,
 }) => {
+  const unfilteredModelVersions = isArchiveModel
+    ? modelVersions
+    : filterLiveVersions(modelVersions);
+
+  const archiveModelVersions = filterArchiveVersions(modelVersions);
   const navigate = useNavigate();
   const { preferredModelRegistry } = React.useContext(ModelRegistrySelectorContext);
 
@@ -58,7 +64,7 @@ const ModelVersionListView: React.FC<ModelVersionListViewProps> = ({
     React.useState(false);
 
   const filteredModelVersions = filterModelVersions(unfilteredModelVersions, search, searchType);
-  const date = rm?.lastUpdateTimeSinceEpoch && new Date(parseInt(rm.lastUpdateTimeSinceEpoch));
+  const date = rm.lastUpdateTimeSinceEpoch && new Date(parseInt(rm.lastUpdateTimeSinceEpoch));
 
   if (unfilteredModelVersions.length === 0) {
     if (isArchiveModel) {
@@ -72,7 +78,7 @@ const ModelVersionListView: React.FC<ModelVersionListViewProps> = ({
               alt="missing version"
             />
           )}
-          description={`${rm?.name} has no registered versions.`}
+          description={`${rm.name} has no registered versions.`}
         />
       );
     }
@@ -86,14 +92,16 @@ const ModelVersionListView: React.FC<ModelVersionListViewProps> = ({
             alt="missing version"
           />
         )}
-        description={`${rm?.name} has no registered versions. Register a version to this model.`}
+        description={`${rm.name} has no registered versions. Register a version to this model.`}
         primaryActionText="Register new version"
-        secondaryActionText="View archived versions"
         primaryActionOnClick={() => {
-          navigate(registerVersionForModelUrl(rm?.id, preferredModelRegistry?.metadata.name));
+          navigate(registerVersionForModelUrl(rm.id, preferredModelRegistry?.metadata.name));
         }}
+        secondaryActionText={
+          archiveModelVersions.length !== 0 ? 'View archived versions' : undefined
+        }
         secondaryActionOnClick={() => {
-          navigate(modelVersionArchiveUrl(rm?.id, preferredModelRegistry?.metadata.name));
+          navigate(modelVersionArchiveUrl(rm.id, preferredModelRegistry?.metadata.name));
         }}
       />
     );
@@ -125,9 +133,9 @@ const ModelVersionListView: React.FC<ModelVersionListViewProps> = ({
             <ToolbarToggleGroup toggleIcon={<FilterIcon />} breakpoint="xl">
               <ToolbarGroup variant="filter-group">
                 <ToolbarFilter
-                  chips={search === '' ? [] : [search]}
-                  deleteChip={() => setSearch('')}
-                  deleteChipGroup={() => setSearch('')}
+                  labels={search === '' ? [] : [search]}
+                  deleteLabel={() => setSearch('')}
+                  deleteLabelGroup={() => setSearch('')}
                   categoryName={searchType}
                 >
                   <SimpleSelect
@@ -146,7 +154,7 @@ const ModelVersionListView: React.FC<ModelVersionListViewProps> = ({
                     icon={<FilterIcon />}
                   />
                 </ToolbarFilter>
-                <ToolbarItem variant="search-filter">
+                <ToolbarItem>
                   <SearchInput
                     placeholder={`Find by ${searchType.toLowerCase()}`}
                     value={search}
@@ -164,10 +172,10 @@ const ModelVersionListView: React.FC<ModelVersionListViewProps> = ({
               <>
                 <ToolbarItem>
                   <Button
-                    variant="secondary"
+                    variant="primary"
                     onClick={() => {
                       navigate(
-                        registerVersionForModelUrl(rm?.id, preferredModelRegistry?.metadata.name),
+                        registerVersionForModelUrl(rm.id, preferredModelRegistry?.metadata.name),
                       );
                     }}
                   >
@@ -194,12 +202,13 @@ const ModelVersionListView: React.FC<ModelVersionListViewProps> = ({
                       </MenuToggle>
                     )}
                     shouldFocusToggleOnSelect
+                    popperProps={{ appendTo: 'inline' }}
                   >
                     <DropdownList>
                       <DropdownItem
                         onClick={() =>
                           navigate(
-                            modelVersionArchiveUrl(rm?.id, preferredModelRegistry?.metadata.name),
+                            modelVersionArchiveUrl(rm.id, preferredModelRegistry?.metadata.name),
                           )
                         }
                       >

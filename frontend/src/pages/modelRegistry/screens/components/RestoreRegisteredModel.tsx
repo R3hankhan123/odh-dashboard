@@ -1,19 +1,17 @@
 import * as React from 'react';
-import { Modal } from '@patternfly/react-core';
+import { Modal } from '@patternfly/react-core/deprecated';
 import DashboardModalFooter from '~/concepts/dashboard/DashboardModalFooter';
 import useNotification from '~/utilities/useNotification';
 
 interface RestoreRegisteredModelModalProps {
   onCancel: () => void;
   onSubmit: () => void;
-  isOpen: boolean;
   registeredModelName: string;
 }
 
 export const RestoreRegisteredModelModal: React.FC<RestoreRegisteredModelModalProps> = ({
   onCancel,
   onSubmit,
-  isOpen,
   registeredModelName,
 }) => {
   const notification = useNotification();
@@ -42,7 +40,7 @@ export const RestoreRegisteredModelModal: React.FC<RestoreRegisteredModelModalPr
 
   return (
     <Modal
-      isOpen={isOpen}
+      isOpen
       title="Restore model?"
       variant="small"
       onClose={onClose}

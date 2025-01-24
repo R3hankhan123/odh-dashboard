@@ -1,15 +1,6 @@
 import React from 'react';
-import {
-  Form,
-  FormGroup,
-  TextInput,
-  Modal,
-  ModalVariant,
-  Tabs,
-  Tab,
-  TabTitleText,
-  Popover,
-} from '@patternfly/react-core';
+import { Form, FormGroup, Tabs, Tab, TabTitleText, Popover } from '@patternfly/react-core';
+import { Modal, ModalVariant } from '@patternfly/react-core/deprecated';
 import { OutlinedQuestionCircleIcon } from '@patternfly/react-icons';
 import { importBYONImage, updateBYONImage } from '~/services/imagesService';
 import { ResponseStatus, BYONImagePackage, BYONImage } from '~/types';
@@ -18,12 +9,15 @@ import DashboardModalFooter from '~/concepts/dashboard/DashboardModalFooter';
 import { filterBlankPackages } from '~/pages/BYONImages/utils';
 import { AcceleratorIdentifierMultiselect } from '~/pages/BYONImages/BYONImageModal/AcceleratorIdentifierMultiselect';
 import DashboardPopupIconButton from '~/concepts/dashboard/DashboardPopupIconButton';
+import K8sNameDescriptionField, {
+  useK8sNameDescriptionFieldData,
+} from '~/concepts/k8s/K8sNameDescriptionField/K8sNameDescriptionField';
+import { isK8sNameDescriptionDataValid } from '~/concepts/k8s/K8sNameDescriptionField/utils';
 import ImageLocationField from './ImageLocationField';
 import DisplayedContentTabContent from './DisplayedContentTabContent';
 
 export type ManageBYONImageModalProps = {
   existingImage?: BYONImage;
-  isOpen: boolean;
   onClose: (submitted: boolean) => void;
 };
 
@@ -32,74 +26,59 @@ export enum DisplayedContentTab {
   PACKAGES,
 }
 
-const ManageBYONImageModal: React.FC<ManageBYONImageModalProps> = ({
-  existingImage,
-  isOpen,
-  onClose,
-}) => {
+const ManageBYONImageModal: React.FC<ManageBYONImageModalProps> = ({ existingImage, onClose }) => {
   const [activeTabKey, setActiveTabKey] = React.useState<string | number>(
     DisplayedContentTab.SOFTWARE,
   );
   const [isProgress, setIsProgress] = React.useState(false);
   const [repository, setRepository] = React.useState('');
-  const [displayName, setDisplayName] = React.useState('');
-  const [description, setDescription] = React.useState('');
   const [recommendedAcceleratorIdentifiers, setRecommendedAcceleratorIdentifiers] = React.useState<
     string[]
   >([]);
   const [software, setSoftware] = React.useState<BYONImagePackage[]>([]);
   const [packages, setPackages] = React.useState<BYONImagePackage[]>([]);
-  const [tempSoftware, setTempSoftware] = React.useState<BYONImagePackage[]>([]);
-  const [tempPackages, setTempPackages] = React.useState<BYONImagePackage[]>([]);
-  const [editIndex, setEditIndex] = React.useState<number>();
   const userName = useAppSelector((state) => state.user || '');
   const [error, setError] = React.useState<Error>();
 
-  const isEditing = editIndex !== undefined;
+  const { data: byonNameDesc, onDataChange: setByonNameDesc } = useK8sNameDescriptionFieldData({
+    initialData: existingImage
+      ? {
+          name: existingImage.display_name,
+          k8sName: existingImage.name,
+          description: existingImage.description,
+        }
+      : undefined,
+    regexp: /^[a-z0-9]+(?:[._-][a-z0-9]+)*[a-z0-9]?$/,
+    invalidCharsMessage:
+      'Must start and end with a letter or number. Valid characters include lowercase letters, numbers, and the special characters: period (.), hyphen (-), and underscore (_). Special characters cannot appear consecutively.',
+  });
 
   React.useEffect(() => {
     if (existingImage) {
       setRepository(existingImage.url);
-      setDisplayName(existingImage.display_name);
-      setDescription(existingImage.description);
       setPackages(existingImage.packages);
       setSoftware(existingImage.software);
-      setTempPackages(existingImage.packages);
-      setTempSoftware(existingImage.software);
       setRecommendedAcceleratorIdentifiers(existingImage.recommendedAcceleratorIdentifiers);
     }
   }, [existingImage]);
 
-  const onBeforeClose = (submitted: boolean) => {
-    onClose(submitted);
-    setIsProgress(false);
-    setActiveTabKey(DisplayedContentTab.SOFTWARE);
-    setRepository('');
-    setDisplayName('');
-    setDescription('');
-    setRecommendedAcceleratorIdentifiers([]);
-    setSoftware([]);
-    setPackages([]);
-    setTempSoftware([]);
-    setTempPackages([]);
-    setError(undefined);
-  };
-
   const handleResponse = (response: ResponseStatus) => {
+    setIsProgress(false);
     if (response.success === false) {
       setError(new Error(response.error));
     } else {
-      onBeforeClose(true);
+      onClose(true);
     }
   };
 
   const submit = () => {
+    setIsProgress(true);
     if (existingImage) {
       updateBYONImage({
         name: existingImage.name,
         // eslint-disable-next-line camelcase
-        display_name: displayName,
-        description,
+        display_name: byonNameDesc.name,
+        description: byonNameDesc.description,
         recommendedAcceleratorIdentifiers,
         packages: filterBlankPackages(packages),
         software: filterBlankPackages(software),
@@ -107,9 +86,10 @@ const ManageBYONImageModal: React.FC<ManageBYONImageModalProps> = ({
     } else {
       importBYONImage({
         // eslint-disable-next-line camelcase
-        display_name: displayName,
+        display_name: byonNameDesc.name,
+        name: byonNameDesc.k8sName.value,
         url: repository,
-        description,
+        description: byonNameDesc.description,
         recommendedAcceleratorIdentifiers,
         provider: userName,
         packages: filterBlankPackages(packages),
@@ -123,18 +103,18 @@ const ManageBYONImageModal: React.FC<ManageBYONImageModalProps> = ({
       onEscapePress={(e) => e.preventDefault()}
       variant={ModalVariant.medium}
       title={`${existingImage ? 'Update' : 'Import'} notebook image`}
-      isOpen={isOpen}
-      onClose={() => onBeforeClose(false)}
-      showClose={!isEditing}
+      isOpen
+      onClose={() => onClose(false)}
       footer={
         <DashboardModalFooter
           error={error}
           alertTitle={`Error ${existingImage ? 'updating' : 'importing'} notebook image`}
           submitLabel={existingImage ? 'Update' : 'Import'}
-          isSubmitDisabled={isProgress || displayName === '' || repository === '' || isEditing}
+          isSubmitDisabled={
+            isProgress || !isK8sNameDescriptionDataValid(byonNameDesc) || repository === ''
+          }
           onSubmit={submit}
-          onCancel={() => onBeforeClose(false)}
-          isCancelDisabled={isEditing}
+          onCancel={() => onClose(false)}
         />
       }
       data-testid="notebook-image-modal"
@@ -150,37 +130,14 @@ const ManageBYONImageModal: React.FC<ManageBYONImageModalProps> = ({
           location={repository}
           setLocation={setRepository}
         />
-
-        <FormGroup label="Name" isRequired fieldId="byon-image-name-input">
-          <TextInput
-            id="byon-image-name-input"
-            isRequired
-            type="text"
-            data-testid="byon-image-name-input"
-            name="byon-image-name-input"
-            value={displayName}
-            onChange={(e, value) => {
-              setDisplayName(value);
-            }}
-          />
-        </FormGroup>
-        <FormGroup label="Description" fieldId="byon-image-description-input">
-          <TextInput
-            id="byon-image-description-input"
-            isRequired
-            type="text"
-            data-testid="byon-image-description-input"
-            name="byon-image-description-input"
-            aria-describedby="byon-image-description-input"
-            value={description}
-            onChange={(e, value) => {
-              setDescription(value);
-            }}
-          />
-        </FormGroup>
+        <K8sNameDescriptionField
+          data={byonNameDesc}
+          onDataChange={setByonNameDesc}
+          dataTestId="byon-image"
+        />
         <FormGroup
           label="Accelerator identifier"
-          labelIcon={
+          labelHelp={
             <Popover bodyContent="Add recommended accelerator identifiers for this image.">
               <DashboardPopupIconButton
                 icon={<OutlinedQuestionCircleIcon />}
@@ -209,7 +166,6 @@ const ManageBYONImageModal: React.FC<ManageBYONImageModalProps> = ({
               aria-label="Displayed content software tab"
               data-testid="displayed-content-software-tab"
               tabContentId={`tabContent-${DisplayedContentTab.SOFTWARE}`}
-              isDisabled={activeTabKey !== DisplayedContentTab.SOFTWARE && isEditing}
             />
             <Tab
               eventKey={DisplayedContentTab.PACKAGES}
@@ -217,7 +173,6 @@ const ManageBYONImageModal: React.FC<ManageBYONImageModalProps> = ({
               aria-label="Displayed content packages tab"
               data-testid="displayed-content-packages-tab"
               tabContentId={`tabContent-${DisplayedContentTab.PACKAGES}`}
-              isDisabled={activeTabKey !== DisplayedContentTab.PACKAGES && isEditing}
             />
           </Tabs>
           <DisplayedContentTabContent
@@ -225,20 +180,12 @@ const ManageBYONImageModal: React.FC<ManageBYONImageModalProps> = ({
             tabKey={DisplayedContentTab.SOFTWARE}
             resources={software}
             setResources={setSoftware}
-            tempResources={tempSoftware}
-            setTempResources={setTempSoftware}
-            editIndex={editIndex}
-            setEditIndex={setEditIndex}
           />
           <DisplayedContentTabContent
             activeKey={activeTabKey}
             tabKey={DisplayedContentTab.PACKAGES}
             resources={packages}
             setResources={setPackages}
-            tempResources={tempPackages}
-            setTempResources={setTempPackages}
-            editIndex={editIndex}
-            setEditIndex={setEditIndex}
           />
         </FormGroup>
       </Form>

@@ -1,11 +1,5 @@
 import * as React from 'react';
-import {
-  Breadcrumb,
-  Button,
-  EmptyStateVariant,
-  PageSection,
-  PageSectionVariants,
-} from '@patternfly/react-core';
+import { Breadcrumb, Button, EmptyStateVariant, PageSection } from '@patternfly/react-core';
 import { useNavigate } from 'react-router-dom';
 import ApplicationsPage from '~/pages/ApplicationsPage';
 import { BreadcrumbItemType } from '~/types';
@@ -15,6 +9,7 @@ import { getBreadcrumbItemComponents } from '~/pages/modelServing/screens/metric
 import ManageBiasConfigurationModal from '~/pages/modelServing/screens/metrics/bias/BiasConfigurationPage/BiasConfigurationModal/ManageBiasConfigurationModal';
 import { MetricsTabKeys } from '~/pages/modelServing/screens/metrics/types';
 import { getDisplayNameFromK8sResource } from '~/concepts/k8s/utils';
+import { TrustyInstallState } from '~/concepts/trustyai/types';
 import BiasConfigurationTable from './BiasConfigurationTable';
 import BiasConfigurationEmptyState from './BiasConfigurationEmptyState';
 
@@ -27,13 +22,14 @@ const BiasConfigurationPage: React.FC<BiasConfigurationPageProps> = ({
   breadcrumbItems,
   inferenceService,
 }) => {
-  const { biasMetricConfigs, loaded, loadError, refresh } = useModelBiasData();
+  const { biasMetricConfigs, statusState, refresh } = useModelBiasData();
   const navigate = useNavigate();
   const firstRender = React.useRef(true);
   const [isOpen, setOpen] = React.useState(false);
 
+  const isInstalled = statusState.type === TrustyInstallState.INSTALLED;
   React.useEffect(() => {
-    if (loaded && !loadError) {
+    if (isInstalled) {
       if (firstRender.current) {
         firstRender.current = false;
         if (biasMetricConfigs.length === 0) {
@@ -41,7 +37,7 @@ const BiasConfigurationPage: React.FC<BiasConfigurationPageProps> = ({
         }
       }
     }
-  }, [loaded, biasMetricConfigs, loadError]);
+  }, [biasMetricConfigs, isInstalled]);
 
   return (
     <>
@@ -56,11 +52,11 @@ const BiasConfigurationPage: React.FC<BiasConfigurationPageProps> = ({
               : 'View metrics'}
           </Button>
         }
-        loaded={loaded}
+        loaded={isInstalled}
         provideChildrenPadding
         empty={biasMetricConfigs.length === 0}
         emptyStatePage={
-          <PageSection isFilled variant={PageSectionVariants.light}>
+          <PageSection hasBodyWrapper={false} isFilled>
             <BiasConfigurationEmptyState
               actionButton={<Button onClick={() => setOpen(true)}>Configure metric</Button>}
               variant={EmptyStateVariant.lg}
@@ -73,16 +69,17 @@ const BiasConfigurationPage: React.FC<BiasConfigurationPageProps> = ({
           onConfigure={() => setOpen(true)}
         />
       </ApplicationsPage>
-      <ManageBiasConfigurationModal
-        isOpen={isOpen}
-        onClose={(submit) => {
-          if (submit) {
-            refresh();
-          }
-          setOpen(false);
-        }}
-        inferenceService={inferenceService}
-      />
+      {isOpen ? (
+        <ManageBiasConfigurationModal
+          onClose={(submit) => {
+            if (submit) {
+              refresh();
+            }
+            setOpen(false);
+          }}
+          inferenceService={inferenceService}
+        />
+      ) : null}
     </>
   );
 };

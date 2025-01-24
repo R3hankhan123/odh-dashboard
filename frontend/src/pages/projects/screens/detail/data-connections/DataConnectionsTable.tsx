@@ -38,25 +38,28 @@ const DataConnectionsTable: React.FC<DataConnectionsTableProps> = ({
           />
         )}
       />
-      <ManageDataConnectionModal
-        isOpen={!!editDataConnection}
-        existingData={editDataConnection}
-        onClose={(updated) => {
-          if (updated) {
-            refreshData();
-          }
-          setEditDataConnection(undefined);
-        }}
-      />
-      <DeleteDataConnectionModal
-        dataConnection={deleteDataConnection}
-        onClose={(deleted) => {
-          if (deleted) {
-            refreshData();
-          }
-          setDeleteDataConnection(undefined);
-        }}
-      />
+      {editDataConnection ? (
+        <ManageDataConnectionModal
+          existingData={editDataConnection}
+          onClose={(updated) => {
+            if (updated) {
+              refreshData();
+            }
+            setEditDataConnection(undefined);
+          }}
+        />
+      ) : null}
+      {deleteDataConnection ? (
+        <DeleteDataConnectionModal
+          dataConnection={deleteDataConnection}
+          onClose={(deleted) => {
+            if (deleted) {
+              refreshData();
+            }
+            setDeleteDataConnection(undefined);
+          }}
+        />
+      ) : null}
     </>
   );
 };

@@ -8,7 +8,7 @@ import { be } from '~/__tests__/cypress/cypress/utils/should';
 import { ServiceModel } from '~/__tests__/cypress/cypress/utils/models';
 import { verifyRelativeURL } from '~/__tests__/cypress/cypress/utils/url';
 import { mockRegisteredModel } from '~/__mocks__/mockRegisteredModel';
-import type { ModelVersion } from '~/concepts/modelRegistry/types';
+import { ModelRegistryMetadataType, type ModelVersion } from '~/concepts/modelRegistry/types';
 import { mockModelVersion } from '~/__mocks__/mockModelVersion';
 import { mockModelRegistryService } from '~/__mocks__/mockModelRegistryService';
 import type { ServiceKind } from '~/k8sTypes';
@@ -33,16 +33,40 @@ const initIntercepts = ({
     mockModelVersion({
       author: 'Author 1',
       id: '1',
-      labels: [
-        'Financial data',
-        'Fraud detection',
-        'Test label',
-        'Machine learning',
-        'Next data to be overflow',
-        'Test label x',
-        'Test label y',
-        'Test label z',
-      ],
+      customProperties: {
+        'Financial data': {
+          metadataType: ModelRegistryMetadataType.STRING,
+          string_value: '',
+        },
+        'Fraud detection': {
+          metadataType: ModelRegistryMetadataType.STRING,
+          string_value: '',
+        },
+        'Test label': {
+          metadataType: ModelRegistryMetadataType.STRING,
+          string_value: '',
+        },
+        'Machine learning': {
+          metadataType: ModelRegistryMetadataType.STRING,
+          string_value: '',
+        },
+        'Next data to be overflow': {
+          metadataType: ModelRegistryMetadataType.STRING,
+          string_value: '',
+        },
+        'Test label x': {
+          metadataType: ModelRegistryMetadataType.STRING,
+          string_value: '',
+        },
+        'Test label y': {
+          metadataType: ModelRegistryMetadataType.STRING,
+          string_value: '',
+        },
+        'Test label z': {
+          metadataType: ModelRegistryMetadataType.STRING,
+          string_value: '',
+        },
+      },
     }),
     mockModelVersion({ id: '2', name: 'model version' }),
   ],
@@ -61,6 +85,16 @@ const initIntercepts = ({
     mockDashboardConfig({
       disableModelRegistry: disableModelRegistryFeature,
     }),
+  );
+  cy.interceptOdh(
+    `GET /api/service/modelregistry/:serviceName/api/model_registry/:apiVersion/model_versions`,
+    {
+      path: {
+        serviceName: 'modelregistry-sample',
+        apiVersion: MODEL_REGISTRY_API_VERSION,
+      },
+    },
+    mockModelVersionList({ items: modelVersions }),
   );
 
   cy.interceptK8sList(ServiceModel, mockK8sResourceList(modelRegistries));
@@ -145,7 +179,10 @@ describe('Model Versions', () => {
     });
 
     modelRegistry.visit();
-    modelRegistry.findModelRegistry().findSelectOption('modelregistry-sample').click();
+    modelRegistry
+      .findModelRegistry()
+      .findSelectOption('modelregistry-sample Model registry description')
+      .click();
     cy.reload();
     const registeredModelRow = modelRegistry.getRow('Fraud detection model');
     registeredModelRow.findName().contains('Fraud detection model').click();
@@ -200,11 +237,22 @@ describe('Model Versions', () => {
     modelRegistry.findModelVersionsTableRows().contains('new model version');
     modelRegistry.findModelVersionsTableSearch().focused().clear();
 
+    // filtering by label
+    modelRegistry.findModelVersionsTableSearch().type('Financial');
+    modelRegistry.findModelVersionsTableRows().should('have.length', 1);
+    modelRegistry.findModelVersionsTableRows().contains('new model version');
+    modelRegistry.findModelVersionsTableSearch().focused().clear();
+
     // filtering by model version author
     modelRegistry.findModelVersionsTableFilter().findSelectOption('Author').click();
     modelRegistry.findModelVersionsTableSearch().type('Test author');
     modelRegistry.findModelVersionsTableRows().should('have.length', 1);
     modelRegistry.findModelVersionsTableRows().contains('Test author');
+
+    // searching with no matches shows no results screen
+    modelRegistry.findModelVersionsTableSearch().focused().clear();
+    modelRegistry.findModelVersionsTableSearch().type('no matches for this');
+    modelRegistry.findModelRegistryEmptyTableState();
   });
 
   it('Model version details back button should lead to versions table', () => {

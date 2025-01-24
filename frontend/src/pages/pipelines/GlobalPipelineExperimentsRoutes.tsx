@@ -20,12 +20,15 @@ import {
   ExperimentCreateSchedulePage,
 } from '~/pages/pipelines/global/experiments/ExperimentCreateRunPage';
 import PipelineAvailabilityLoader from '~/pages/pipelines/global/pipelines/PipelineAvailabilityLoader';
-import ExperimentCloneRunPage from '~/pages/pipelines/global/experiments/ExperimentCloneRunPage';
-import ExperimentCloneRecurringRunPage from '~/pages/pipelines/global/experiments/ExperimentCloneRecurringRunPage';
+import ExperimentDuplicateRunPage from '~/pages/pipelines/global/experiments/ExperimentDuplicateRunPage';
+import ExperimentDuplicateRecurringRunPage from '~/pages/pipelines/global/experiments/ExperimentDuplicateRecurringRunPage';
 import { ExperimentCoreDetails } from './global/GlobalPipelineCoreDetails';
-import GlobalComparePipelineRunsLoader from './global/experiments/compareRuns/GlobalComparePipelineRunsLoader';
+import {
+  ExperimentComparePipelineRunsLoader,
+  ExperimentManagePipelineRunsLoader,
+} from './global/experiments/compareRuns/GlobalComparePipelineRunsLoader';
 import CompareRunsPage from './global/experiments/compareRuns/CompareRunsPage';
-import { ManageRunsPage } from './global/experiments/compareRuns/ManageRunsPage';
+import ManageRunsPage from './global/experiments/compareRuns/ManageRunsPage';
 
 const GlobalPipelineExperimentsRoutes: React.FC = () => (
   <ProjectsRoutes>
@@ -78,9 +81,9 @@ const GlobalPipelineExperimentsRoutes: React.FC = () => (
               }
             />
             <Route
-              path="clone/:runId"
+              path="duplicate/:runId"
               element={
-                <ExperimentCoreDetails BreadcrumbDetailsComponent={ExperimentCloneRunPage} />
+                <ExperimentCoreDetails BreadcrumbDetailsComponent={ExperimentDuplicateRunPage} />
               }
             />
           </Route>
@@ -100,23 +103,25 @@ const GlobalPipelineExperimentsRoutes: React.FC = () => (
               }
             />
             <Route
-              path="clone/:recurringRunId"
+              path="duplicate/:recurringRunId"
               element={
                 <ExperimentCoreDetails
-                  BreadcrumbDetailsComponent={ExperimentCloneRecurringRunPage}
+                  BreadcrumbDetailsComponent={ExperimentDuplicateRecurringRunPage}
                 />
               }
             />
           </Route>
-          <Route path="compareRuns" element={<GlobalComparePipelineRunsLoader />}>
-            <Route
-              index
-              element={<ExperimentCoreDetails BreadcrumbDetailsComponent={CompareRunsPage} />}
-            />
-          </Route>
+          <Route
+            path="compareRuns"
+            element={
+              <ExperimentComparePipelineRunsLoader BreadcrumbDetailsComponent={CompareRunsPage} />
+            }
+          />
           <Route
             path="compareRuns/add"
-            element={<ExperimentCoreDetails BreadcrumbDetailsComponent={ManageRunsPage} />}
+            element={
+              <ExperimentManagePipelineRunsLoader BreadcrumbDetailsComponent={ManageRunsPage} />
+            }
           />
           <Route path="*" element={<Navigate to="./runs" />} />
         </Route>

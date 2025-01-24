@@ -1,5 +1,5 @@
 import { AlertVariant } from '@patternfly/react-core';
-import { SecretKind, ServingRuntimeKind } from '~/k8sTypes';
+import { SecretKind, ServingContainer, ServingRuntimeKind } from '~/k8sTypes';
 import { DataConnection, EnvVariableDataEntry } from '~/pages/projects/types';
 import { ContainerResources } from '~/types';
 
@@ -40,14 +40,9 @@ export type SupportedModelFormatsInfo = {
   priority?: number;
 };
 
-export type CreatingServingRuntimeObject = {
-  name: string;
+export type CreatingServingRuntimeObject = CreatingModelServingObjectCommon & {
   servingRuntimeTemplateName: string;
   numReplicas: number;
-  modelSize: ModelServingSize;
-  externalRoute: boolean;
-  tokenAuth: boolean;
-  tokens: ServingRuntimeToken[];
   imageName?: string;
   supportedModelFormatsInfo?: SupportedModelFormatsInfo;
 };
@@ -64,30 +59,39 @@ export type ModelServingSize = {
   resources: ContainerResources;
 };
 
-export type CreatingInferenceServiceObject = {
-  name: string;
+export type CreatingInferenceServiceObject = CreatingModelServingObjectCommon & {
   project: string;
   servingRuntimeName: string;
   storage: InferenceServiceStorage;
-  modelSize: ModelServingSize;
   format: InferenceServiceFormat;
   maxReplicas: number;
   minReplicas: number;
+  labels?: Record<string, string>;
+  servingRuntimeArgs?: ServingContainer['args'];
+  servingRuntimeEnvVars?: ServingContainer['env'];
+  isKServeRawDeployment?: boolean;
+};
+
+export type CreatingModelServingObjectCommon = {
+  name: string;
+  k8sName: string;
+  modelSize: ModelServingSize;
   externalRoute: boolean;
   tokenAuth: boolean;
   tokens: ServingRuntimeToken[];
-  labels?: Record<string, string>;
 };
 
 export enum InferenceServiceStorageType {
   NEW_STORAGE = 'new-storage',
   EXISTING_STORAGE = 'existing-storage',
+  EXISTING_URI = 'existing-uri',
 }
 
 export type InferenceServiceStorage = {
   type: InferenceServiceStorageType;
   path: string;
   dataConnection: string;
+  uri?: string;
   awsData: EnvVariableDataEntry[];
   alert?: {
     type: AlertVariant;
@@ -106,15 +110,15 @@ export type ServingRuntimeEditInfo = {
   secrets: SecretKind[];
 };
 
+type PlatformStatus = {
+  enabled: boolean;
+  installed: boolean;
+};
 export type ServingPlatformStatuses = {
-  kServe: {
-    enabled: boolean;
-    installed: boolean;
-  };
-  modelMesh: {
-    enabled: boolean;
-    installed: boolean;
-  };
+  kServe: PlatformStatus;
+  kServeNIM: PlatformStatus;
+  modelMesh: PlatformStatus;
+  platformEnabledCount: number;
 };
 
 export type LabeledDataConnection = {

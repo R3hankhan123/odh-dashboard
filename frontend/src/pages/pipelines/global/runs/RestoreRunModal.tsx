@@ -1,18 +1,17 @@
 import * as React from 'react';
 import { ListItem, Stack, StackItem } from '@patternfly/react-core';
 import { usePipelinesAPI } from '~/concepts/pipelines/context';
-import { PipelineRunKFv2 } from '~/concepts/pipelines/kfTypes';
+import { PipelineRunKF } from '~/concepts/pipelines/kfTypes';
 import { RestoreModal } from '~/concepts/pipelines/content/RestoreModal';
 import { BulkActionExpandableSection } from '~/pages/projects/components/BulkActionExpandableSection';
 import { PipelineRunTabTitle } from './types';
 
 interface RestoreRunModalProps {
-  isOpen: boolean;
-  runs: PipelineRunKFv2[];
+  runs: PipelineRunKF[];
   onCancel: () => void;
 }
 
-export const RestoreRunModal: React.FC<RestoreRunModalProps> = ({ isOpen, runs, onCancel }) => {
+export const RestoreRunModal: React.FC<RestoreRunModalProps> = ({ runs, onCancel }) => {
   const isSingleRestoring = runs.length === 1;
   const { api } = usePipelinesAPI();
   const onSubmit = React.useCallback(
@@ -24,7 +23,6 @@ export const RestoreRunModal: React.FC<RestoreRunModalProps> = ({ isOpen, runs, 
       title={`Restore run${isSingleRestoring ? '' : 's'}?`}
       onCancel={onCancel}
       onSubmit={onSubmit}
-      isOpen={isOpen}
       testId="restore-run-modal"
       alertTitle={`Error restoring ${isSingleRestoring ? runs[0].display_name : 'runs'}`}
     >

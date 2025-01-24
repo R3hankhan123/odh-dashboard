@@ -6,8 +6,6 @@ import {
   ButtonVariant,
   List,
   ListItem,
-  Modal,
-  ModalVariant,
   Panel,
   PanelMain,
   Progress,
@@ -15,6 +13,7 @@ import {
   Stack,
   StackItem,
 } from '@patternfly/react-core';
+import { Modal, ModalVariant } from '@patternfly/react-core/deprecated';
 import { EventStatus, NotebookStatus } from '~/types';
 import { EventKind } from '~/k8sTypes';
 import NotebookRouteLink from './NotebookRouteLink';
@@ -22,7 +21,6 @@ import { NotebookState } from './types';
 import { getEventFullMessage, getEventTimestamp } from './utils';
 
 type StartNotebookModalProps = {
-  isOpen: boolean;
   notebookState: NotebookState;
   notebookStatus: NotebookStatus | null;
   events: EventKind[];
@@ -36,7 +34,6 @@ type SpawnStatus = {
 };
 
 const StartNotebookModal: React.FC<StartNotebookModalProps> = ({
-  isOpen,
   notebookStatus,
   events,
   notebookState,
@@ -49,22 +46,7 @@ const StartNotebookModal: React.FC<StartNotebookModalProps> = ({
   const spawnFailed = spawnStatus?.status === AlertVariant.danger;
 
   React.useEffect(() => {
-    if (!isOpen) {
-      // Reset the modal
-      setSpawnPercentile(0);
-      setSpawnStatus(null);
-    } else if (isRunning) {
-      setSpawnPercentile(100);
-      setSpawnStatus({
-        status: AlertVariant.success,
-        title: 'Success',
-        description: 'The notebook server is up and running.',
-      });
-    }
-  }, [isOpen, isRunning]);
-
-  React.useEffect(() => {
-    if (isStarting && !isRunning && isOpen) {
+    if (isStarting && !isRunning) {
       if (!notebookStatus) {
         return;
       }
@@ -91,7 +73,7 @@ const StartNotebookModal: React.FC<StartNotebookModalProps> = ({
         });
       }
     }
-  }, [notebookStatus, isStarting, isRunning, isOpen]);
+  }, [notebookStatus, isStarting, isRunning]);
 
   const renderProgress = () => {
     let variant: ProgressVariant | undefined;
@@ -113,7 +95,7 @@ const StartNotebookModal: React.FC<StartNotebookModalProps> = ({
     let title: string;
     if (events.length > 0 && currentEvent) {
       title = currentEvent;
-    } else if (isOpen && !isStarting) {
+    } else if (!isStarting) {
       title = 'Creating resources...';
     } else {
       title = 'Waiting for server request to start...';
@@ -143,7 +125,7 @@ const StartNotebookModal: React.FC<StartNotebookModalProps> = ({
         onClick={() => onClose(true)}
         isDisabled={!open}
       >
-        Cancel
+        Stop workbench
       </Button>
     ) : (
       <NotebookRouteLink
@@ -184,12 +166,12 @@ const StartNotebookModal: React.FC<StartNotebookModalProps> = ({
 
   return (
     <Modal
-      aria-label="Starting server modal"
+      aria-label="Starting workbench modal"
       description="Depending on the size and resources requested, this can take several minutes."
       appendTo={document.body}
       variant={ModalVariant.small}
-      title="Starting server"
-      isOpen={isOpen}
+      title="Starting workbench"
+      isOpen
       showClose
       onClose={() => onClose(false)}
     >

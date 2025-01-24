@@ -12,20 +12,25 @@ import {
 import { LabeledDataConnection, ServingPlatformStatuses } from '~/pages/modelServing/screens/types';
 import { ServingRuntimePlatform } from '~/types';
 import { mockInferenceServiceK8sResource } from '~/__mocks__/mockInferenceServiceK8sResource';
-import { createPvc, createSecret, getConfigMap } from '~/api';
-import { PersistentVolumeClaimKind } from '~/k8sTypes';
-import { getNGCSecretType, getNIMData } from '~/pages/modelServing/screens/projects/nimUtils';
+import { createPvc, createSecret } from '~/api';
+import { PersistentVolumeClaimKind, ServingRuntimeKind } from '~/k8sTypes';
+import {
+  getNIMData,
+  getNIMResource,
+  updateServingRuntimeTemplate,
+} from '~/pages/modelServing/screens/projects/nimUtils';
 
 jest.mock('~/api', () => ({
   getSecret: jest.fn(),
   createSecret: jest.fn(),
-  getConfigMap: jest.fn(),
   createPvc: jest.fn(),
+  getInferenceServiceContext: jest.fn(),
 }));
 
 jest.mock('~/pages/modelServing/screens/projects/nimUtils', () => ({
+  ...jest.requireActual('~/pages/modelServing/screens/projects/nimUtils'),
   getNIMData: jest.fn(),
-  getNGCSecretType: jest.fn(),
+  getNIMResource: jest.fn(),
 }));
 
 describe('filterOutConnectionsWithoutBucket', () => {
@@ -60,15 +65,22 @@ const getMockServingPlatformStatuses = ({
   kServeInstalled = true,
   modelMeshEnabled = true,
   modelMeshInstalled = true,
+  nimEnabled = false,
+  nimInstalled = false,
 }): ServingPlatformStatuses => ({
   kServe: {
     enabled: kServeEnabled,
     installed: kServeInstalled,
   },
+  kServeNIM: {
+    enabled: nimEnabled,
+    installed: nimInstalled,
+  },
   modelMesh: {
     enabled: modelMeshEnabled,
     installed: modelMeshInstalled,
   },
+  platformEnabledCount: [kServeEnabled, nimEnabled, modelMeshEnabled].filter(Boolean).length,
 });
 
 describe('getProjectModelServingPlatform', () => {
@@ -223,14 +235,13 @@ describe('getCreateInferenceServiceLabels', () => {
 
 describe('createNIMSecret', () => {
   const projectName = 'test-project';
-  const secretName = 'test-secret';
   const dryRun = false;
 
   const nimSecretMock = {
     apiVersion: 'v1',
     kind: 'Secret',
     metadata: {
-      name: secretName,
+      name: 'ngc-secret',
       namespace: projectName,
     },
     data: {},
@@ -246,30 +257,24 @@ describe('createNIMSecret', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    (getNGCSecretType as jest.Mock).mockImplementation((isNGC: boolean) =>
-      isNGC ? 'kubernetes.io/dockerconfigjson' : 'Opaque',
-    );
   });
 
   it('should create NGC secret when isNGC is true', async () => {
     (getNIMData as jest.Mock).mockResolvedValueOnce(nimSecretDataNGC);
     (createSecret as jest.Mock).mockResolvedValueOnce(nimSecretMock);
 
-    const result = await createNIMSecret(projectName, secretName, true, dryRun);
+    const result = await createNIMSecret(projectName, 'ngc-secret', true, dryRun);
 
-    expect(getNIMData).toHaveBeenCalledWith(true);
-    expect(getNGCSecretType).toHaveBeenCalledWith(true);
+    expect(getNIMData).toHaveBeenCalledWith('ngc-secret', true);
     expect(createSecret).toHaveBeenCalledWith(
       {
         apiVersion: 'v1',
         kind: 'Secret',
         metadata: {
-          name: secretName,
+          name: 'ngc-secret',
           namespace: projectName,
         },
-        data: {
-          '.dockerconfigjson': 'mocked-dockerconfig-json',
-        },
+        data: nimSecretDataNGC,
         type: 'kubernetes.io/dockerconfigjson',
       },
       { dryRun },
@@ -281,21 +286,18 @@ describe('createNIMSecret', () => {
     (getNIMData as jest.Mock).mockResolvedValueOnce(nimSecretDataNonNGC);
     (createSecret as jest.Mock).mockResolvedValueOnce(nimSecretMock);
 
-    const result = await createNIMSecret(projectName, secretName, false, dryRun);
+    const result = await createNIMSecret(projectName, 'nvidia-nim-secrets', false, dryRun);
 
-    expect(getNIMData).toHaveBeenCalledWith(false);
-    expect(getNGCSecretType).toHaveBeenCalledWith(false);
+    expect(getNIMData).toHaveBeenCalledWith('nvidia-nim-secrets', false);
     expect(createSecret).toHaveBeenCalledWith(
       {
         apiVersion: 'v1',
         kind: 'Secret',
         metadata: {
-          name: secretName,
+          name: 'nvidia-nim-secrets',
           namespace: projectName,
         },
-        data: {
-          NGC_API_KEY: 'mocked-api-key',
-        },
+        data: nimSecretDataNonNGC,
         type: 'Opaque',
       },
       { dryRun },
@@ -306,15 +308,25 @@ describe('createNIMSecret', () => {
   it('should reject if getNIMData throws an error', async () => {
     (getNIMData as jest.Mock).mockRejectedValueOnce(new Error('Error retrieving secret data'));
 
-    await expect(createNIMSecret(projectName, secretName, true, dryRun)).rejects.toThrow(
-      'Error creating NIM NGC secret',
+    await expect(createNIMSecret(projectName, 'ngc-secret', true, dryRun)).rejects.toThrow(
+      'Error creating NGC secret',
+    );
+  });
+
+  it('should reject if createSecret throws an error', async () => {
+    (getNIMData as jest.Mock).mockResolvedValueOnce(nimSecretDataNonNGC);
+    (createSecret as jest.Mock).mockRejectedValueOnce(new Error('Error creating secret'));
+
+    await expect(createNIMSecret(projectName, 'nvidia-nim-secrets', false, dryRun)).rejects.toThrow(
+      'Error creating NIM secret',
     );
   });
 });
-describe('fetchNIMModelNames', () => {
-  const dashboardNamespace = 'test-namespace';
-  const NIM_CONFIGMAP_NAME = 'nvidia-nim-images-data';
 
+describe('fetchNIMModelNames', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
   const configMapMock = {
     data: {
       model1: JSON.stringify({
@@ -336,16 +348,12 @@ describe('fetchNIMModelNames', () => {
     },
   };
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
   it('should return model infos when configMap has data', async () => {
-    (getConfigMap as jest.Mock).mockResolvedValueOnce(configMapMock);
+    (getNIMResource as jest.Mock).mockResolvedValueOnce(configMapMock);
 
-    const result = await fetchNIMModelNames(dashboardNamespace);
+    const result = await fetchNIMModelNames();
 
-    expect(getConfigMap).toHaveBeenCalledWith(dashboardNamespace, NIM_CONFIGMAP_NAME);
+    expect(getNIMResource).toHaveBeenCalledWith('nimConfig');
     expect(result).toEqual([
       {
         name: 'model1',
@@ -369,20 +377,20 @@ describe('fetchNIMModelNames', () => {
   });
 
   it('should return undefined if configMap has no data', async () => {
-    (getConfigMap as jest.Mock).mockResolvedValueOnce({ data: {} });
+    (getNIMResource as jest.Mock).mockResolvedValueOnce({ data: {} });
 
-    const result = await fetchNIMModelNames(dashboardNamespace);
+    const result = await fetchNIMModelNames();
 
-    expect(getConfigMap).toHaveBeenCalledWith(dashboardNamespace, NIM_CONFIGMAP_NAME);
+    expect(getNIMResource).toHaveBeenCalledWith('nimConfig');
     expect(result).toBeUndefined();
   });
 
   it('should return undefined if configMap.data is not defined', async () => {
-    (getConfigMap as jest.Mock).mockResolvedValueOnce({ data: undefined });
+    (getNIMResource as jest.Mock).mockResolvedValueOnce({ data: undefined });
 
-    const result = await fetchNIMModelNames(dashboardNamespace);
+    const result = await fetchNIMModelNames();
 
-    expect(getConfigMap).toHaveBeenCalledWith(dashboardNamespace, NIM_CONFIGMAP_NAME);
+    expect(getNIMResource).toHaveBeenCalledWith('nimConfig');
     expect(result).toBeUndefined();
   });
 });
@@ -421,10 +429,8 @@ describe('createNIMPVC', () => {
 
     expect(createPvc).toHaveBeenCalledWith(
       {
-        nameDesc: {
-          name: pvcName,
-          description: '',
-        },
+        name: pvcName,
+        description: '',
         size: pvcSize,
       },
       projectName,
@@ -440,15 +446,92 @@ describe('createNIMPVC', () => {
 
     expect(createPvc).toHaveBeenCalledWith(
       {
-        nameDesc: {
-          name: pvcName,
-          description: '',
-        },
+        name: pvcName,
+        description: '',
         size: pvcSize,
       },
       projectName,
       { dryRun: dryRunFlag },
       true,
     );
+  });
+});
+
+describe('updateServingRuntimeTemplate', () => {
+  const servingRuntimeMock: ServingRuntimeKind = {
+    apiVersion: 'serving.kserve.io/v1alpha1',
+    kind: 'ServingRuntime',
+    metadata: {
+      name: 'test-serving-runtime',
+      namespace: 'test-namespace',
+    },
+    spec: {
+      containers: [
+        {
+          name: 'test-container',
+          volumeMounts: [
+            { name: 'nim-pvc', mountPath: '/mnt/models/cache' },
+            { name: 'other-volume', mountPath: '/mnt/other-path' },
+          ],
+        },
+      ],
+      volumes: [
+        { name: 'nim-pvc', persistentVolumeClaim: { claimName: 'old-nim-pvc' } },
+        { name: 'other-volume', emptyDir: {} },
+      ],
+    },
+  };
+
+  it('should update PVC name in volumeMounts and volumes', () => {
+    const pvcName = 'new-nim-pvc';
+    const updatedServingRuntime = updateServingRuntimeTemplate(servingRuntimeMock, pvcName);
+
+    expect(updatedServingRuntime.spec.containers[0].volumeMounts).toEqual([
+      { name: pvcName, mountPath: '/mnt/models/cache' },
+      { name: 'other-volume', mountPath: '/mnt/other-path' },
+    ]);
+
+    expect(updatedServingRuntime.spec.volumes).toEqual([
+      { name: pvcName, persistentVolumeClaim: { claimName: pvcName } },
+      { name: 'other-volume', emptyDir: {} },
+    ]);
+  });
+
+  it('should not modify unrelated volumeMounts and volumes', () => {
+    const pvcName = 'new-nim-pvc';
+    const updatedServingRuntime = updateServingRuntimeTemplate(servingRuntimeMock, pvcName);
+
+    expect(updatedServingRuntime.spec.containers[0].volumeMounts?.[1]).toEqual({
+      name: 'other-volume',
+      mountPath: '/mnt/other-path',
+    });
+
+    expect(updatedServingRuntime.spec.volumes?.[1]).toEqual({
+      name: 'other-volume',
+      emptyDir: {},
+    });
+  });
+
+  it('should handle serving runtime with containers but no volumeMounts', () => {
+    const servingRuntimeWithoutVolumeMounts: ServingRuntimeKind = {
+      apiVersion: 'serving.kserve.io/v1alpha1',
+      kind: 'ServingRuntime',
+      metadata: {
+        name: 'test-serving-runtime-no-volumeMounts',
+        namespace: 'test-namespace',
+      },
+      spec: {
+        containers: [
+          {
+            name: 'test-container',
+          },
+        ],
+      },
+    };
+
+    const pvcName = 'new-nim-pvc';
+    const result = updateServingRuntimeTemplate(servingRuntimeWithoutVolumeMounts, pvcName);
+
+    expect(result.spec.containers[0].volumeMounts).toBeUndefined();
   });
 });

@@ -1,15 +1,7 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
-
 import { PageSection } from '@patternfly/react-core';
-
-import {
-  ExperimentKFv2,
-  PipelineKFv2,
-  PipelineRecurringRunKFv2,
-  PipelineRunKFv2,
-  PipelineVersionKFv2,
-} from '~/concepts/pipelines/kfTypes';
+import { ExperimentKF, PipelineRecurringRunKF, PipelineRunKF } from '~/concepts/pipelines/kfTypes';
 import GenericSidebar from '~/components/GenericSidebar';
 import {
   CreateRunPageSections,
@@ -29,29 +21,28 @@ import { ValueOf } from '~/typeHelpers';
 import { useGetSearchParamValues } from '~/utilities/useGetSearchParamValues';
 import { PipelineRunSearchParam } from '~/concepts/pipelines/content/types';
 import { asEnumMember } from '~/utilities/utils';
-import { SupportedArea, useIsAreaAvailable } from '~/concepts/areas';
 import useDefaultExperiment from '~/pages/pipelines/global/experiments/useDefaultExperiment';
 
 type RunPageProps = {
-  cloneRun?: PipelineRunKFv2 | PipelineRecurringRunKFv2 | null;
+  duplicateRun?: PipelineRunKF | PipelineRecurringRunKF | null;
   contextPath: string;
   testId?: string;
   runType: RunTypeOption;
-  contextExperiment?: ExperimentKFv2 | null;
-  contextPipeline?: PipelineKFv2 | null;
-  contextPipelineVersion?: PipelineVersionKFv2 | null;
+  contextExperiment?: ExperimentKF | null;
 };
 
 const RunPage: React.FC<RunPageProps> = ({
-  cloneRun,
+  duplicateRun,
   contextPath,
   testId,
   runType,
   contextExperiment,
-  contextPipeline,
-  contextPipelineVersion,
 }) => {
   const location = useLocation();
+  // the data passed in when creating a run from a pipeline version
+  const { pipeline: contextPipeline, version: contextPipelineVersion } =
+    location.state?.contextData || {};
+  // the data passed in when switching between runs and schedules
   const {
     nameDesc: locationNameDesc,
     pipeline: locationPipeline,
@@ -64,7 +55,6 @@ const RunPage: React.FC<RunPageProps> = ({
   const triggerType = asEnumMember(triggerTypeString, ScheduledType);
   const isSchedule = runType === RunTypeOption.SCHEDULED;
 
-  const isExperimentsAvailable = useIsAreaAvailable(SupportedArea.PIPELINE_EXPERIMENTS).status;
   const [defaultExperiment] = useDefaultExperiment();
 
   const jumpToSections = Object.values(CreateRunPageSections).filter(
@@ -89,9 +79,12 @@ const RunPage: React.FC<RunPageProps> = ({
     [isSchedule, triggerType],
   );
 
-  const [formData, setFormDataValue] = useRunFormData(cloneRun, {
-    nameDesc: cloneRun
-      ? { name: `Duplicate of ${cloneRun.display_name}`, description: cloneRun.description }
+  const [formData, setFormDataValue] = useRunFormData(duplicateRun, {
+    nameDesc: duplicateRun
+      ? {
+          name: `Duplicate of ${duplicateRun.display_name}`,
+          description: duplicateRun.description,
+        }
       : locationNameDesc || { name: '', description: '' },
     runType: runTypeData,
     pipeline: locationPipeline || contextPipeline,
@@ -104,25 +97,14 @@ const RunPage: React.FC<RunPageProps> = ({
     [setFormDataValue],
   );
 
-  const runPageSectionTitlesEdited = isExperimentsAvailable
-    ? runPageSectionTitles
-    : {
-        ...runPageSectionTitles,
-        [CreateRunPageSections.PROJECT_AND_EXPERIMENT]: 'Project',
-      };
-
   return (
     <div data-testid={testId}>
-      <PageSection isFilled variant="light">
-        <GenericSidebar
-          sections={jumpToSections}
-          titles={runPageSectionTitlesEdited}
-          maxWidth={175}
-        >
-          <RunForm isCloned={!!cloneRun} data={formData} onValueChange={onValueChange} />
+      <PageSection hasBodyWrapper={false} isFilled>
+        <GenericSidebar sections={jumpToSections} titles={runPageSectionTitles} maxWidth={175}>
+          <RunForm isDuplicated={!!duplicateRun} data={formData} onValueChange={onValueChange} />
         </GenericSidebar>
       </PageSection>
-      <PageSection stickyOnBreakpoint={{ default: 'bottom' }} variant="light">
+      <PageSection hasBodyWrapper={false} stickyOnBreakpoint={{ default: 'bottom' }}>
         <RunPageFooter data={formData} contextPath={contextPath} />
       </PageSection>
     </div>

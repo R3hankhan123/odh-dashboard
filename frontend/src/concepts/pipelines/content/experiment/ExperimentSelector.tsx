@@ -3,23 +3,20 @@ import { EmptyStateVariant } from '@patternfly/react-core';
 import { TableVariant } from '@patternfly/react-table';
 import PipelineSelectorTableRow from '~/concepts/pipelines/content/pipelineSelector/PipelineSelectorTableRow';
 import { TableBase, getTableColumnSort } from '~/components/table';
-import { ExperimentKFv2 } from '~/concepts/pipelines/kfTypes';
+import { ExperimentKF } from '~/concepts/pipelines/kfTypes';
 import PipelineViewMoreFooterRow from '~/concepts/pipelines/content/tables/PipelineViewMoreFooterRow';
 import DashboardEmptyTableView from '~/concepts/dashboard/DashboardEmptyTableView';
-import {
-  useActiveExperimentSelector,
-  useAllExperimentSelector,
-} from '~/concepts/pipelines/content/pipelineSelector/useCreateSelectors';
+import { useActiveExperimentSelector } from '~/concepts/pipelines/content/pipelineSelector/useCreateSelectors';
 import { experimentSelectorColumns } from '~/concepts/pipelines/content/experiment/columns';
 import SearchSelector from '~/components/searchSelector/SearchSelector';
 
 type ExperimentSelectorProps = {
   selection?: string;
-  onSelect: (experiment: ExperimentKFv2) => void;
+  onSelect: (experiment: ExperimentKF) => void;
 };
 
 const InnerExperimentSelector: React.FC<
-  ReturnType<typeof useAllExperimentSelector> & ExperimentSelectorProps
+  ReturnType<typeof useActiveExperimentSelector> & ExperimentSelectorProps
 > = ({
   fetchedSize,
   totalSize,
@@ -93,12 +90,6 @@ const InnerExperimentSelector: React.FC<
     )}
   </SearchSelector>
 );
-
-export const AllExperimentSelector: React.FC<ExperimentSelectorProps> = (props) => {
-  const selectorProps = useAllExperimentSelector();
-  return <InnerExperimentSelector {...props} {...selectorProps} />;
-};
-
 export const ActiveExperimentSelector: React.FC<ExperimentSelectorProps> = (props) => {
   const selectorProps = useActiveExperimentSelector();
   return <InnerExperimentSelector {...props} {...selectorProps} />;

@@ -3,26 +3,35 @@ import { mockDscStatus } from '~/__mocks__/mockDscStatus';
 import { mockInferenceServiceK8sResource } from '~/__mocks__/mockInferenceServiceK8sResource';
 import { mockK8sResourceList } from '~/__mocks__/mockK8sResourceList';
 import { mockProjectK8sResource } from '~/__mocks__/mockProjectK8sResource';
-import { mockSecretK8sResource } from '~/__mocks__/mockSecretK8sResource';
+import {
+  mockCustomSecretK8sResource,
+  mockSecretK8sResource,
+} from '~/__mocks__/mockSecretK8sResource';
 import {
   configureBiasMetricModal,
   modelMetricsBias,
   modelMetricsConfigureSection,
   modelMetricsKserve,
+  modelMetricsKserveNim,
   modelMetricsPerformance,
   serverMetrics,
 } from '~/__tests__/cypress/cypress/pages/modelMetrics';
-import type { InferenceServiceKind, ServingRuntimeKind } from '~/k8sTypes';
+import type {
+  InferenceServiceKind,
+  SecretKind,
+  ServingRuntimeKind,
+  TrustyAIKind,
+} from '~/k8sTypes';
 import { mockPrometheusServing } from '~/__mocks__/mockPrometheusServing';
 import { mockPrometheusBias } from '~/__mocks__/mockPrometheusBias';
 import { mockMetricsRequest } from '~/__mocks__/mockMetricsRequests';
-import { mockTrustyAIServiceK8sResource } from '~/__mocks__/mockTrustyAIServiceK8sResource';
+import { mockTrustyAIServiceForDbK8sResource } from '~/__mocks__/mockTrustyAIServiceK8sResource';
 import { mockRouteK8sResource } from '~/__mocks__/mockRouteK8sResource';
 import { projectDetailsSettingsTab } from '~/__tests__/cypress/cypress/pages/projects';
 import { mockServingRuntimeK8sResource } from '~/__mocks__/mockServingRuntimeK8sResource';
 import {
-  mockServingRuntimeTemplateK8sResource,
   mockInvalidTemplateK8sResource,
+  mockServingRuntimeTemplateK8sResource,
 } from '~/__mocks__/mockServingRuntimeTemplateK8sResource';
 import { ServingRuntimePlatform } from '~/types';
 import { mock403Error, mock404Error } from '~/__mocks__/mockK8sStatus';
@@ -40,31 +49,56 @@ import {
   MOCK_KSERVE_METRICS_CONFIG_2,
   MOCK_KSERVE_METRICS_CONFIG_3,
   MOCK_KSERVE_METRICS_CONFIG_MISSING_QUERY,
+  MOCK_NIM_METRICS_CONFIG_3,
+  MOCK_NIM_METRICS_CONFIG_MISSING_QUERY,
+  MOCK_NIM_METRICS_CONFIG_MISSING_QUERY_2,
+  MOCK_NIM_METRICS_CONFIG_MISSING_QUERY_3,
   mockKserveMetricsConfigMap,
+  mockNimMetricsConfigMap,
 } from '~/__mocks__/mockKserveMetricsConfigMap';
+import { mockOdhApplication } from '~/__mocks__/mockOdhApplication';
 
 type HandlersProps = {
   disablePerformanceMetrics?: boolean;
-  disableBiasMetrics?: boolean;
+  disableNIMModelServing?: boolean;
+  disableTrustyBiasMetrics?: boolean;
   disableKServeMetrics?: boolean;
   servingRuntimes?: ServingRuntimeKind[];
   inferenceServices?: InferenceServiceKind[];
   hasServingData: boolean;
   hasBiasData: boolean;
   enableModelMesh?: boolean;
+  enableNIM?: boolean;
   isTrustyAIAvailable?: boolean;
   isTrustyAIInstalled?: boolean;
 };
 
+const mockTrustyDBSecret = (): SecretKind =>
+  mockCustomSecretK8sResource({
+    name: 'test-secret',
+    namespace: 'test-project',
+    data: {
+      databaseKind: 'mariadb',
+      databaseUsername: 'trustyaiUsername',
+      databasePassword: 'trustyaiPassword',
+      databaseService: 'mariadb',
+      databasePort: '3306',
+      databaseName: 'trustyai_db',
+      databaseGeneration: 'update',
+    },
+  });
+
 const initIntercepts = ({
   disablePerformanceMetrics,
-  disableBiasMetrics,
+  disableNIMModelServing = true,
+  disableTrustyBiasMetrics,
   disableKServeMetrics,
   servingRuntimes = [mockServingRuntimeK8sResource({})],
   inferenceServices = [mockInferenceServiceK8sResource({ isModelMesh: true })],
   hasServingData = false,
   hasBiasData = false,
   enableModelMesh = true,
+  enableNIM = false,
   isTrustyAIAvailable = true,
   isTrustyAIInstalled = true,
 }: HandlersProps) => {
@@ -77,15 +111,18 @@ const initIntercepts = ({
   cy.interceptOdh(
     'GET /api/config',
     mockDashboardConfig({
-      disableBiasMetrics,
+      disableTrustyBiasMetrics,
       disablePerformanceMetrics,
+      disableNIMModelServing,
       disableKServeMetrics,
     }),
   );
 
   cy.interceptK8sList(
     ProjectModel,
-    mockK8sResourceList([mockProjectK8sResource({ k8sName: 'test-project', enableModelMesh })]),
+    mockK8sResourceList([
+      mockProjectK8sResource({ k8sName: 'test-project', enableModelMesh, enableNIM }),
+    ]),
   );
   cy.interceptK8sList(ServingRuntimeModel, mockK8sResourceList(servingRuntimes));
   cy.interceptK8sList(InferenceServiceModel, mockK8sResourceList(inferenceServices));
@@ -174,18 +211,34 @@ const initIntercepts = ({
       name: 'trustyai-service',
     },
     isTrustyAIInstalled
-      ? mockTrustyAIServiceK8sResource({
+      ? mockTrustyAIServiceForDbK8sResource({
           isAvailable: isTrustyAIAvailable,
+          // If you're already installed for the test, it doesn't matter when
+          creationTimestamp: new Date('1970-01-01').toISOString(),
         })
       : { statusCode: 404, body: mock404Error({}) },
   );
   cy.interceptK8s(RouteModel, mockRouteK8sResource({ name: 'trustyai-service' }));
 };
 
+const initInterceptsToEnableNim = () => {
+  cy.interceptOdh('GET /api/components', null, [mockOdhApplication({})]);
+  cy.interceptOdh(
+    'GET /api/integrations/:internalRoute',
+    { path: { internalRoute: 'nim' } },
+    {
+      isInstalled: true,
+      isEnabled: true,
+      canInstall: false,
+      error: '',
+    },
+  );
+};
+
 describe('Model Metrics', () => {
   it('Empty State No Serving Data Available', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       hasServingData: false,
       hasBiasData: false,
@@ -197,7 +250,7 @@ describe('Model Metrics', () => {
 
   it('Serving Chart Shows Data', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       hasServingData: true,
       hasBiasData: false,
@@ -209,7 +262,7 @@ describe('Model Metrics', () => {
 
   it('Empty State No Bias Data Available', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       hasServingData: false,
       hasBiasData: false,
@@ -239,7 +292,7 @@ describe('Model Metrics', () => {
 
   it('Bias Charts Show Data', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       hasServingData: false,
       hasBiasData: true,
@@ -269,7 +322,7 @@ describe('Model Metrics', () => {
 
   it('Server metrics show no data available', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       hasServingData: false,
       hasBiasData: false,
@@ -284,7 +337,7 @@ describe('Model Metrics', () => {
 
   it('Server metrics show data', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       hasServingData: true,
       hasBiasData: false,
@@ -299,7 +352,7 @@ describe('Model Metrics', () => {
 
   it('Bias metrics is not configured', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       hasServingData: false,
       hasBiasData: false,
@@ -314,7 +367,7 @@ describe('Model Metrics', () => {
 
   it('Performance Metrics Tab Hidden', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: true,
       hasServingData: false,
       hasBiasData: false,
@@ -326,7 +379,7 @@ describe('Model Metrics', () => {
 
   it('Bias Metrics Tab Hidden', () => {
     initIntercepts({
-      disableBiasMetrics: true,
+      disableTrustyBiasMetrics: true,
       disablePerformanceMetrics: false,
       hasServingData: false,
       hasBiasData: false,
@@ -338,17 +391,14 @@ describe('Model Metrics', () => {
 
   it('Disable Trusty AI', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       hasServingData: false,
       hasBiasData: false,
     });
 
     projectDetailsSettingsTab.visit('test-project');
-    projectDetailsSettingsTab
-      .findTrustyAIInstallCheckbox()
-      .should('be.enabled')
-      .should('be.checked');
+    projectDetailsSettingsTab.trustyai.findUninstallButton().should('be.enabled');
 
     // test disabling
     cy.interceptK8s(
@@ -361,24 +411,17 @@ describe('Model Metrics', () => {
       {},
     ).as('uninstallTrustyAI');
 
-    projectDetailsSettingsTab.findTrustyAIInstallCheckbox().uncheck();
-    projectDetailsSettingsTab
-      .getTrustyAIUninstallModal()
-      .findSubmitButton()
-      .should('not.be.enabled');
-    projectDetailsSettingsTab.getTrustyAIUninstallModal().findInput().type('trustyai');
-    projectDetailsSettingsTab
-      .getTrustyAIUninstallModal()
-      .findSubmitButton()
-      .should('be.enabled')
-      .click();
+    projectDetailsSettingsTab.trustyai.findUninstallButton().click();
+    projectDetailsSettingsTab.trustyai.deleteModal.findSubmitButton().should('not.be.enabled');
+    projectDetailsSettingsTab.trustyai.deleteModal.findInput().type('trustyai');
+    projectDetailsSettingsTab.trustyai.deleteModal.findSubmitButton().should('be.enabled').click();
 
     cy.wait('@uninstallTrustyAI');
   });
 
   it('Enable Trusty AI', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       hasServingData: false,
       hasBiasData: false,
@@ -386,29 +429,45 @@ describe('Model Metrics', () => {
     });
 
     projectDetailsSettingsTab.visit('test-project');
-    projectDetailsSettingsTab
-      .findTrustyAIInstallCheckbox()
-      .should('be.enabled')
-      .should('not.be.checked');
+    projectDetailsSettingsTab.trustyai.findInstallButton().should('be.enabled');
 
     // test enabling
     cy.interceptK8s(
       'POST',
       TrustyAIApplicationsModel,
-      mockTrustyAIServiceK8sResource({ isAvailable: true }),
+      mockTrustyAIServiceForDbK8sResource({ isAvailable: true }),
     ).as('installTrustyAI');
+
+    cy.interceptK8s(SecretModel, mockTrustyDBSecret()).as('getSecret');
 
     cy.interceptK8s(
       TrustyAIApplicationsModel,
-      mockTrustyAIServiceK8sResource({
+      mockTrustyAIServiceForDbK8sResource({
         isAvailable: false,
       }),
     ).as('getTrustyAILoading');
 
-    projectDetailsSettingsTab.findTrustyAIInstallCheckbox().check();
+    projectDetailsSettingsTab.trustyai.findInstallButton().click();
+
+    projectDetailsSettingsTab.trustyai.configureModal.findSubmitButton().should('not.be.enabled');
+
+    projectDetailsSettingsTab.trustyai.configureModal
+      .findExistingNameField()
+      .type('test-secret')
+      .blur();
+
+    // Test we get the secret for validation
+    cy.wait('@getSecret').then((interception) => {
+      expect(interception.response?.body.kind).to.be.eq('Secret');
+    });
+
+    projectDetailsSettingsTab.trustyai.configureModal
+      .findSubmitButton()
+      .should('be.enabled')
+      .click();
 
     cy.wait('@installTrustyAI').then((interception) => {
-      expect(interception.request.body).to.be.eql({
+      expect(interception.request.body).to.containSubset({
         apiVersion: 'trustyai.opendatahub.io/v1alpha1',
         kind: 'TrustyAIService',
         metadata: {
@@ -417,25 +476,20 @@ describe('Model Metrics', () => {
         },
         spec: {
           storage: {
-            format: 'PVC',
-            folder: '/inputs',
-            size: '1Gi',
-          },
-          data: {
-            filename: 'data.csv',
-            format: 'CSV',
+            format: 'DATABASE',
+            databaseConfigurations: 'test-secret',
           },
           metrics: {
             schedule: '5s',
           },
         },
-      });
+      } satisfies TrustyAIKind);
     });
   });
 
   it('Trusty AI enable service error', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       hasServingData: false,
       hasBiasData: false,
@@ -443,15 +497,12 @@ describe('Model Metrics', () => {
     });
 
     projectDetailsSettingsTab.visit('test-project');
-    projectDetailsSettingsTab
-      .findTrustyAIInstallCheckbox()
-      .should('be.enabled')
-      .should('not.be.checked');
+    projectDetailsSettingsTab.trustyai.findInstallButton().should('be.enabled');
 
     cy.interceptK8s(
       'POST',
       TrustyAIApplicationsModel,
-      mockTrustyAIServiceK8sResource({ isAvailable: true }),
+      mockTrustyAIServiceForDbK8sResource({ isAvailable: true }),
     ).as('installTrustyAI');
 
     cy.interceptK8s(
@@ -463,73 +514,31 @@ describe('Model Metrics', () => {
       { statusCode: 403, body: mock403Error({}) },
     ).as('getTrustyAIError');
 
-    projectDetailsSettingsTab.findTrustyAIInstallCheckbox().check();
+    projectDetailsSettingsTab.trustyai.findInstallButton().click();
+
+    projectDetailsSettingsTab.trustyai.configureModal.findSubmitButton().should('not.be.enabled');
+
+    projectDetailsSettingsTab.trustyai.configureModal
+      .findExistingNameField()
+      .type('test-secret')
+      .blur();
+
+    projectDetailsSettingsTab.trustyai.configureModal
+      .findSubmitButton()
+      .should('be.enabled')
+      .click();
 
     cy.wait('@installTrustyAI');
 
     // test service error
     cy.wait('@getTrustyAIError');
 
-    projectDetailsSettingsTab.findTrustyAIServiceError().should('exist');
-  });
-
-  it('Trusty AI enable timeout error', () => {
-    initIntercepts({
-      disableBiasMetrics: false,
-      disablePerformanceMetrics: false,
-      hasServingData: false,
-      hasBiasData: false,
-      isTrustyAIInstalled: false,
-    });
-
-    projectDetailsSettingsTab.visit('test-project');
-    projectDetailsSettingsTab
-      .findTrustyAIInstallCheckbox()
-      .should('be.enabled')
-      .should('not.be.checked');
-
-    cy.interceptK8s(
-      'POST',
-      TrustyAIApplicationsModel,
-      mockTrustyAIServiceK8sResource({ isAvailable: true }),
-    ).as('installTrustyAI');
-
-    cy.interceptK8s(
-      TrustyAIApplicationsModel,
-      mockTrustyAIServiceK8sResource({
-        isAvailable: false,
-        creationTimestamp: new Date('2022-05-15T00:00:00.000Z').toISOString(),
-      }),
-    ).as('getTrustyAITimeout');
-
-    projectDetailsSettingsTab.findTrustyAIInstallCheckbox().check();
-
-    cy.wait('@installTrustyAI');
-
-    // test timeout - timeout is a timestamp after 5 min
-    cy.wait('@getTrustyAITimeout');
-
-    projectDetailsSettingsTab.findTrustyAITimeoutError().should('exist');
-  });
-
-  it('Trusty AI not supported', () => {
-    initIntercepts({
-      disableBiasMetrics: false,
-      disablePerformanceMetrics: false,
-      hasServingData: false,
-      hasBiasData: false,
-      inferenceServices: [],
-      servingRuntimes: [],
-      enableModelMesh: false,
-    });
-
-    projectDetailsSettingsTab.visit('test-project');
-    projectDetailsSettingsTab.findTrustyAIInstallCheckbox().should('not.be.enabled');
+    projectDetailsSettingsTab.trustyai.findError().should('exist');
   });
 
   it('Bias Metrics Show In Table', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       hasServingData: false,
       hasBiasData: true,
@@ -556,7 +565,7 @@ describe('Model Metrics', () => {
 
   it('Configure Bias Metric', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       hasServingData: false,
       hasBiasData: true,
@@ -622,7 +631,7 @@ describe('Model Metrics', () => {
 describe('KServe performance metrics', () => {
   it('should inform user when area disabled', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       disableKServeMetrics: true,
       hasServingData: false,
@@ -635,7 +644,7 @@ describe('KServe performance metrics', () => {
 
   it('should show error when ConfigMap is missing', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       disableKServeMetrics: false,
       hasServingData: true,
@@ -658,7 +667,7 @@ describe('KServe performance metrics', () => {
 
   it('should inform user when serving runtime is unsupported', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       disableKServeMetrics: false,
       hasServingData: true,
@@ -674,7 +683,7 @@ describe('KServe performance metrics', () => {
 
   it('should handle a malformed graph definition gracefully', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       disableKServeMetrics: false,
       hasServingData: true,
@@ -693,7 +702,7 @@ describe('KServe performance metrics', () => {
 
   it('should display only 2 graphs, when the config specifies', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       disableKServeMetrics: false,
       hasServingData: true,
@@ -714,7 +723,7 @@ describe('KServe performance metrics', () => {
 
   it('charts should not error out if a query is missing and there is other data', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       disableKServeMetrics: false,
       hasServingData: true,
@@ -737,7 +746,7 @@ describe('KServe performance metrics', () => {
 
   it('charts should not error out if a query is missing and there is no data', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       disableKServeMetrics: false,
       hasServingData: false,
@@ -760,7 +769,7 @@ describe('KServe performance metrics', () => {
 
   it('charts should show data when serving data is available', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       disableKServeMetrics: false,
       hasServingData: true,
@@ -780,7 +789,7 @@ describe('KServe performance metrics', () => {
 
   it('charts should show empty state when no serving data is available', () => {
     initIntercepts({
-      disableBiasMetrics: false,
+      disableTrustyBiasMetrics: false,
       disablePerformanceMetrics: false,
       disableKServeMetrics: false,
       hasServingData: false,
@@ -795,5 +804,269 @@ describe('KServe performance metrics', () => {
     modelMetricsKserve.getMetricsChart('Mean Model Latency').shouldHaveNoData();
     modelMetricsKserve.getMetricsChart('CPU usage').shouldHaveNoData();
     modelMetricsKserve.getMetricsChart('Memory usage').shouldHaveNoData();
+  });
+});
+
+//Nim Metrics Tests
+describe('KServe NIM metrics', () => {
+  it('should show error when ConfigMap is missing', () => {
+    initIntercepts({
+      disableTrustyBiasMetrics: false,
+      disablePerformanceMetrics: false,
+      disableNIMModelServing: false,
+      disableKServeMetrics: false,
+      hasServingData: true,
+      hasBiasData: false,
+      enableModelMesh: false,
+      enableNIM: true,
+      inferenceServices: [mockInferenceServiceK8sResource({ isModelMesh: false })],
+    });
+
+    initInterceptsToEnableNim();
+
+    cy.interceptK8s(
+      {
+        model: ConfigMapModel,
+        ns: 'test-project',
+        name: 'test-inference-service-metrics-dashboard',
+      },
+      { statusCode: 404, body: mock404Error({}) },
+    );
+
+    modelMetricsKserveNim.visit('test-project', 'test-inference-service');
+    modelMetricsKserveNim.findUnknownErrorCard().should('be.visible');
+  });
+
+  it('should inform user when serving runtime is unsupported', () => {
+    initIntercepts({
+      disableTrustyBiasMetrics: false,
+      disablePerformanceMetrics: false,
+      disableNIMModelServing: false,
+      disableKServeMetrics: false,
+      hasServingData: true,
+      hasBiasData: false,
+      inferenceServices: [mockInferenceServiceK8sResource({ isModelMesh: false })],
+    });
+
+    cy.interceptK8s(ConfigMapModel, mockNimMetricsConfigMap({ supported: false }));
+
+    modelMetricsKserveNim.visit('test-project', 'test-inference-service');
+    modelMetricsKserveNim.findUnsupportedRuntimeCard().should('be.visible');
+  });
+
+  it('should handle a malformed graph definition gracefully', () => {
+    initIntercepts({
+      disableTrustyBiasMetrics: false,
+      disablePerformanceMetrics: false,
+      disableKServeMetrics: false,
+      disableNIMModelServing: false,
+      hasServingData: true,
+      hasBiasData: false,
+      inferenceServices: [mockInferenceServiceK8sResource({ isModelMesh: false })],
+    });
+
+    cy.interceptK8s(
+      ConfigMapModel,
+      mockNimMetricsConfigMap({ config: MOCK_KSERVE_METRICS_CONFIG_2 }),
+    );
+
+    modelMetricsKserveNim.visit('test-project', 'test-inference-service');
+    modelMetricsKserveNim.findUnknownErrorCard().should('be.visible');
+  });
+
+  it('should display only 2 graphs, when the config specifies', () => {
+    initIntercepts({
+      disableTrustyBiasMetrics: false,
+      disablePerformanceMetrics: false,
+      disableKServeMetrics: false,
+      disableNIMModelServing: false,
+      hasServingData: true,
+      hasBiasData: false,
+      enableModelMesh: false,
+      enableNIM: true,
+      inferenceServices: [mockInferenceServiceK8sResource({ isModelMesh: false })],
+    });
+
+    initInterceptsToEnableNim();
+
+    cy.interceptK8s(ConfigMapModel, mockNimMetricsConfigMap({ config: MOCK_NIM_METRICS_CONFIG_3 }));
+
+    modelMetricsKserveNim.visit('test-project', 'test-inference-service');
+    modelMetricsKserveNim.findTab().click();
+    modelMetricsKserveNim.getMetricsChart('GPU cache usage over time').shouldHaveData();
+    modelMetricsKserveNim
+      .getMetricsChart('Current running, waiting, and max requests count')
+      .shouldHaveData();
+    modelMetricsKserveNim.getAllMetricsCharts().should('have.length', 2);
+  });
+
+  it('charts should not error out if a query is missing and there is other data', () => {
+    initIntercepts({
+      disableTrustyBiasMetrics: false,
+      disablePerformanceMetrics: false,
+      disableKServeMetrics: false,
+      disableNIMModelServing: false,
+      hasServingData: true,
+      hasBiasData: false,
+      enableModelMesh: false,
+      enableNIM: true,
+      inferenceServices: [mockInferenceServiceK8sResource({ isModelMesh: false })],
+    });
+
+    initInterceptsToEnableNim();
+
+    cy.interceptK8s(
+      ConfigMapModel,
+      mockNimMetricsConfigMap({ config: MOCK_NIM_METRICS_CONFIG_MISSING_QUERY }),
+    );
+
+    modelMetricsKserveNim.visit('test-project', 'test-inference-service');
+    modelMetricsKserveNim.findTab().click();
+    modelMetricsKserveNim.getAllMetricsCharts().should('have.length', 2);
+    modelMetricsKserveNim.getMetricsChart('GPU cache usage over time').shouldHaveData();
+    modelMetricsKserveNim.getMetricsChart('Tokens count').shouldHaveData();
+  });
+
+  it('charts should not error out if a query is missing and there is no data', () => {
+    initIntercepts({
+      disableTrustyBiasMetrics: false,
+      disablePerformanceMetrics: false,
+      disableKServeMetrics: false,
+      disableNIMModelServing: false,
+      hasServingData: false,
+      hasBiasData: false,
+      enableModelMesh: false,
+      enableNIM: true,
+      inferenceServices: [mockInferenceServiceK8sResource({ isModelMesh: false })],
+    });
+
+    initInterceptsToEnableNim();
+
+    cy.interceptK8s(
+      ConfigMapModel,
+      mockNimMetricsConfigMap({ config: MOCK_NIM_METRICS_CONFIG_MISSING_QUERY }),
+    );
+
+    modelMetricsKserveNim.visit('test-project', 'test-inference-service');
+    modelMetricsKserveNim.findTab().click();
+    modelMetricsKserveNim.getAllMetricsCharts().should('have.length', 2);
+    modelMetricsKserveNim.getMetricsChart('GPU cache usage over time').shouldHaveNoData();
+    modelMetricsKserveNim.getMetricsChart('Tokens count').shouldHaveNoData();
+  });
+
+  it('charts should not error out if a query is missing and there is no data QUERY_2', () => {
+    initIntercepts({
+      disableTrustyBiasMetrics: false,
+      disablePerformanceMetrics: false,
+      disableKServeMetrics: false,
+      disableNIMModelServing: false,
+      hasServingData: false,
+      hasBiasData: false,
+      enableModelMesh: false,
+      enableNIM: true,
+      inferenceServices: [mockInferenceServiceK8sResource({ isModelMesh: false })],
+    });
+
+    initInterceptsToEnableNim();
+
+    cy.interceptK8s(
+      ConfigMapModel,
+      mockNimMetricsConfigMap({ config: MOCK_NIM_METRICS_CONFIG_MISSING_QUERY_2 }),
+    );
+
+    modelMetricsKserveNim.visit('test-project', 'test-inference-service');
+    modelMetricsKserveNim.findTab().click();
+    modelMetricsKserveNim.getAllMetricsCharts().should('have.length', 3);
+    modelMetricsKserveNim.getMetricsChart('GPU cache usage over time').shouldHaveNoData();
+    modelMetricsKserveNim.getMetricsChart('Tokens count').shouldHaveNoData();
+    modelMetricsKserveNim
+      .getMetricsChart('Current running, waiting, and max requests count')
+      .shouldHaveNoData();
+  });
+
+  it('charts should not error out if a query is missing and there is no data QUERY_3', () => {
+    initIntercepts({
+      disableTrustyBiasMetrics: false,
+      disablePerformanceMetrics: false,
+      disableKServeMetrics: false,
+      disableNIMModelServing: false,
+      hasServingData: false,
+      hasBiasData: false,
+      enableModelMesh: false,
+      enableNIM: true,
+      inferenceServices: [mockInferenceServiceK8sResource({ isModelMesh: false })],
+    });
+
+    initInterceptsToEnableNim();
+
+    cy.interceptK8s(
+      ConfigMapModel,
+      mockNimMetricsConfigMap({ config: MOCK_NIM_METRICS_CONFIG_MISSING_QUERY_3 }),
+    );
+
+    modelMetricsKserveNim.visit('test-project', 'test-inference-service');
+    modelMetricsKserveNim.findTab().click();
+    modelMetricsKserveNim.getAllMetricsCharts().should('have.length', 3);
+    modelMetricsKserveNim.getMetricsChart('GPU cache usage over time').shouldHaveNoData();
+    modelMetricsKserveNim.getMetricsChart('Requests outcomes').shouldHaveNoData();
+    modelMetricsKserveNim.getMetricsChart('Tokens count').shouldHaveNoData();
+  });
+
+  it('charts should show data when serving data is available', () => {
+    initIntercepts({
+      disableTrustyBiasMetrics: false,
+      disablePerformanceMetrics: false,
+      disableKServeMetrics: false,
+      disableNIMModelServing: false,
+      hasServingData: true,
+      hasBiasData: false,
+      enableModelMesh: false,
+      enableNIM: true,
+      inferenceServices: [mockInferenceServiceK8sResource({ isModelMesh: false })],
+    });
+
+    initInterceptsToEnableNim();
+
+    cy.interceptK8s(ConfigMapModel, mockNimMetricsConfigMap({ supported: true }));
+    modelMetricsKserveNim.visit('test-project', 'test-inference-service');
+    modelMetricsKserveNim.findTab().click();
+    modelMetricsKserveNim.getAllMetricsCharts().should('have.length', 6);
+    modelMetricsKserveNim.getMetricsChart('GPU cache usage over time').shouldHaveData();
+    modelMetricsKserveNim
+      .getMetricsChart('Current running, waiting, and max requests count')
+      .shouldHaveData();
+    modelMetricsKserveNim.getMetricsChart('Tokens count').shouldHaveData();
+    modelMetricsKserveNim.getMetricsChart('Time to first token').shouldHaveData();
+    modelMetricsKserveNim.getMetricsChart('Time per output token').shouldHaveData();
+    modelMetricsKserveNim.getMetricsChart('Requests outcomes').shouldHaveData();
+  });
+
+  it('charts should show empty state when no serving data is available', () => {
+    initIntercepts({
+      disableTrustyBiasMetrics: false,
+      disablePerformanceMetrics: false,
+      disableKServeMetrics: false,
+      disableNIMModelServing: false,
+      hasServingData: false,
+      hasBiasData: false,
+      enableModelMesh: false,
+      enableNIM: true,
+      inferenceServices: [mockInferenceServiceK8sResource({ isModelMesh: false })],
+    });
+
+    initInterceptsToEnableNim();
+
+    cy.interceptK8s(ConfigMapModel, mockNimMetricsConfigMap({ supported: true }));
+
+    modelMetricsKserveNim.visit('test-project', 'test-inference-service');
+    modelMetricsKserveNim.findTab().click();
+    modelMetricsKserveNim.getMetricsChart('GPU cache usage over time').shouldHaveNoData();
+    modelMetricsKserveNim
+      .getMetricsChart('Current running, waiting, and max requests count')
+      .shouldHaveNoData();
+    modelMetricsKserveNim.getMetricsChart('Tokens count').shouldHaveNoData();
+    modelMetricsKserveNim.getMetricsChart('Time to first token').shouldHaveNoData();
+    modelMetricsKserveNim.getMetricsChart('Time per output token').shouldHaveNoData();
+    modelMetricsKserveNim.getMetricsChart('Requests outcomes').shouldHaveNoData();
   });
 });

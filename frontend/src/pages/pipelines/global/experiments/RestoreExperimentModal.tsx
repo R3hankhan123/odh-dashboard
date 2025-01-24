@@ -2,21 +2,19 @@ import * as React from 'react';
 import { ListItem, StackItem, Stack } from '@patternfly/react-core';
 import { RestoreModal } from '~/concepts/pipelines/content/RestoreModal';
 import { usePipelinesAPI } from '~/concepts/pipelines/context';
-import { ExperimentKFv2 } from '~/concepts/pipelines/kfTypes';
+import { ExperimentKF } from '~/concepts/pipelines/kfTypes';
 import { ExperimentListTabTitle } from '~/pages/pipelines/global/experiments/const';
 import { PipelineRunTabTitle } from '~/pages/pipelines/global/runs';
 import { BulkActionExpandableSection } from '~/pages/projects/components/BulkActionExpandableSection';
 
 interface RestoreExperimentModalProps {
-  experiments: ExperimentKFv2[];
+  experiments: ExperimentKF[];
   onCancel: () => void;
-  isOpen: boolean;
 }
 
 export const RestoreExperimentModal: React.FC<RestoreExperimentModalProps> = ({
   experiments,
   onCancel,
-  isOpen,
 }) => {
   const isSingleRestoring = experiments.length === 1;
 
@@ -30,7 +28,6 @@ export const RestoreExperimentModal: React.FC<RestoreExperimentModalProps> = ({
   );
   return (
     <RestoreModal
-      isOpen={isOpen}
       onCancel={onCancel}
       onSubmit={onSubmit}
       title={`Restore experiment${isSingleRestoring ? '' : 's'}?`}

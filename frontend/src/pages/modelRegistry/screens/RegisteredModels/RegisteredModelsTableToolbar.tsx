@@ -22,10 +22,12 @@ import { ModelRegistrySelectorContext } from '~/concepts/modelRegistry/context/M
 
 type RegisteredModelsTableToolbarProps = {
   toggleGroupItems?: React.ReactNode;
+  onClearAllFilters?: () => void;
 };
 
 const RegisteredModelsTableToolbar: React.FC<RegisteredModelsTableToolbarProps> = ({
   toggleGroupItems: tableToggleGroupItems,
+  onClearAllFilters,
 }) => {
   const navigate = useNavigate();
   const { preferredModelRegistry } = React.useContext(ModelRegistrySelectorContext);
@@ -35,7 +37,7 @@ const RegisteredModelsTableToolbar: React.FC<RegisteredModelsTableToolbarProps> 
   const tooltipRef = React.useRef<HTMLButtonElement>(null);
 
   return (
-    <Toolbar data-testid="registered-models-table-toolbar">
+    <Toolbar data-testid="registered-models-table-toolbar" clearAllFilters={onClearAllFilters}>
       <ToolbarContent>
         <ToolbarToggleGroup toggleIcon={<FilterIcon />} breakpoint="xl">
           {tableToggleGroupItems}
@@ -52,22 +54,19 @@ const RegisteredModelsTableToolbar: React.FC<RegisteredModelsTableToolbarProps> 
                 ref={toggleRef}
                 onClick={() => setIsRegisterNewVersionOpen(!isRegisterNewVersionOpen)}
                 isExpanded={isRegisterNewVersionOpen}
-                splitButtonOptions={{
-                  variant: 'action',
-                  items: [
-                    <MenuToggleAction
-                      id="register-model-button"
-                      key="register-model-button"
-                      data-testid="register-model-button"
-                      aria-label="Register model"
-                      onClick={() =>
-                        navigate(registerModelUrl(preferredModelRegistry?.metadata.name))
-                      }
-                    >
-                      Register model
-                    </MenuToggleAction>,
-                  ],
-                }}
+                splitButtonItems={[
+                  <MenuToggleAction
+                    id="register-model-button"
+                    key="register-model-button"
+                    data-testid="register-model-button"
+                    aria-label="Register model"
+                    onClick={() =>
+                      navigate(registerModelUrl(preferredModelRegistry?.metadata.name))
+                    }
+                  >
+                    Register model
+                  </MenuToggleAction>,
+                ]}
                 aria-label="Register model toggle"
                 data-testid="register-model-split-button"
               />

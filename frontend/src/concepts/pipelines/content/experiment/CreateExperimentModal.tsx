@@ -4,14 +4,14 @@ import {
   Button,
   Form,
   FormGroup,
-  Modal,
   Stack,
   StackItem,
   TextInput,
 } from '@patternfly/react-core';
+import { Modal } from '@patternfly/react-core/deprecated';
 import { usePipelinesAPI } from '~/concepts/pipelines/context';
 import useCreateExperimentData from '~/concepts/pipelines/content/experiment/useCreateExperimentData';
-import { ExperimentKFv2 } from '~/concepts/pipelines/kfTypes';
+import { ExperimentKF } from '~/concepts/pipelines/kfTypes';
 import { getDisplayNameFromK8sResource } from '~/concepts/k8s/utils';
 import {
   NAME_CHARACTER_LIMIT,
@@ -20,11 +20,10 @@ import {
 import { CharLimitHelperText } from '~/components/CharLimitHelperText';
 
 type CreateExperimentModalProps = {
-  isOpen: boolean;
-  onClose: (experiment?: ExperimentKFv2) => void;
+  onClose: (experiment?: ExperimentKF) => void;
 };
 
-const CreateExperimentModal: React.FC<CreateExperimentModalProps> = ({ isOpen, onClose }) => {
+const CreateExperimentModal: React.FC<CreateExperimentModalProps> = ({ onClose }) => {
   const { project, api, apiAvailable } = usePipelinesAPI();
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<Error | undefined>();
@@ -32,7 +31,7 @@ const CreateExperimentModal: React.FC<CreateExperimentModalProps> = ({ isOpen, o
 
   const haveEnoughData = !!name;
 
-  const onBeforeClose = (experiment?: ExperimentKFv2) => {
+  const onBeforeClose = (experiment?: ExperimentKF) => {
     onClose(experiment);
     setSubmitting(false);
     setError(undefined);
@@ -41,7 +40,7 @@ const CreateExperimentModal: React.FC<CreateExperimentModalProps> = ({ isOpen, o
 
   return (
     <Modal
-      isOpen={isOpen}
+      isOpen
       title="Create experiment"
       onClose={() => onBeforeClose()}
       actions={[

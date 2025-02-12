@@ -19,12 +19,14 @@ export type MockDashboardConfigType = {
   disableKServeAuth?: boolean;
   disableKServeMetrics?: boolean;
   disableKServeRaw?: boolean;
+  disableKServeOCIModels?: boolean;
   disableModelMesh?: boolean;
   disableAcceleratorProfiles?: boolean;
   disableHardwareProfiles?: boolean;
   disablePerformanceMetrics?: boolean;
   disableTrustyBiasMetrics?: boolean;
   disableDistributedWorkloads?: boolean;
+  disableModelCatalog?: boolean;
   disableModelRegistry?: boolean;
   disableModelRegistrySecureDB?: boolean;
   disableServingRuntimeParams?: boolean;
@@ -33,6 +35,7 @@ export type MockDashboardConfigType = {
   disableNotebookController?: boolean;
   notebookSizes?: NotebookSize[];
   disableNIMModelServing?: boolean;
+  disableFineTuning?: boolean;
 };
 
 export const mockDashboardConfig = ({
@@ -53,19 +56,21 @@ export const mockDashboardConfig = ({
   disableKServeAuth = false,
   disableKServeMetrics = true,
   disableKServeRaw = true,
+  disableKServeOCIModels = true,
   disableModelMesh = false,
   disableAcceleratorProfiles = false,
   disableHardwareProfiles = false,
   disablePerformanceMetrics = false,
   disableTrustyBiasMetrics = false,
   disableDistributedWorkloads = false,
+  disableModelCatalog = true,
   disableModelRegistry = false,
   disableModelRegistrySecureDB = false,
   disableServingRuntimeParams = false,
-  disableConnectionTypes = true,
   disableStorageClasses = false,
   disableNotebookController = false,
   disableNIMModelServing = true,
+  disableFineTuning = true,
   notebookSizes = [
     {
       name: 'XSmall',
@@ -166,16 +171,18 @@ export const mockDashboardConfig = ({
       disableKServeAuth,
       disableKServeMetrics,
       disableKServeRaw,
+      disableKServeOCIModels,
       disableModelMesh,
       disableAcceleratorProfiles,
       disableHardwareProfiles,
       disableDistributedWorkloads,
+      disableModelCatalog,
       disableModelRegistry,
       disableModelRegistrySecureDB,
       disableServingRuntimeParams,
-      disableConnectionTypes,
       disableStorageClasses,
       disableNIMModelServing,
+      disableFineTuning,
     },
     notebookController: {
       enabled: !disableNotebookController,

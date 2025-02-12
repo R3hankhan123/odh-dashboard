@@ -5,6 +5,7 @@ import {
   StackItem,
   Timestamp,
   TimestampTooltipVariant,
+  Truncate,
 } from '@patternfly/react-core';
 import { ActionsColumn, ExpandableRowContent, Tbody, Td, Tr } from '@patternfly/react-table';
 import { useNavigate } from 'react-router-dom';
@@ -47,9 +48,11 @@ const HardwareProfilesTableRow: React.FC<HardwareProfilesTableRowProps> = ({
         />
         <Td dataLabel="Name">
           <TableRowTitleDescription
-            title={hardwareProfile.spec.displayName}
+            title={<Truncate content={hardwareProfile.spec.displayName} />}
             description={hardwareProfile.spec.description}
+            resource={hardwareProfile}
             truncateDescriptionLines={2}
+            wrapResourceTitle={false}
           />
         </Td>
         <Td dataLabel="Enabled">

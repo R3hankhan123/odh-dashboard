@@ -23,16 +23,18 @@ export const allFeatureFlags: string[] = Object.keys({
   disableKServeAuth: false,
   disableKServeMetrics: false,
   disableKServeRaw: true,
+  disableKServeOCIModels: true,
   disableModelMesh: false,
   disableAcceleratorProfiles: false,
   disableHardwareProfiles: false,
   disableDistributedWorkloads: false,
+  disableModelCatalog: true,
   disableModelRegistry: false,
   disableModelRegistrySecureDB: false,
   disableServingRuntimeParams: false,
-  disableConnectionTypes: false,
   disableStorageClasses: false,
   disableNIMModelServing: true,
+  disableFineTuning: true,
 } satisfies DashboardCommonConfig);
 
 export const SupportedAreasStateMap: SupportedAreasState = {
@@ -51,9 +53,6 @@ export const SupportedAreasStateMap: SupportedAreasState = {
   [SupportedArea.CUSTOM_RUNTIMES]: {
     featureFlags: ['disableCustomServingRuntimes'],
     reliantAreas: [SupportedArea.MODEL_SERVING],
-  },
-  [SupportedArea.CONNECTION_TYPES]: {
-    featureFlags: ['disableConnectionTypes'],
   },
   [SupportedArea.STORAGE_CLASSES]: {
     featureFlags: ['disableStorageClasses'],
@@ -89,6 +88,10 @@ export const SupportedAreasStateMap: SupportedAreasState = {
     featureFlags: ['disableKServeRaw'],
     reliantAreas: [SupportedArea.K_SERVE, SupportedArea.MODEL_SERVING],
   },
+  [SupportedArea.K_SERVE_OCI]: {
+    featureFlags: ['disableKServeOCIModels'],
+    reliantAreas: [SupportedArea.K_SERVE, SupportedArea.MODEL_SERVING],
+  },
   [SupportedArea.MODEL_MESH]: {
     featureFlags: ['disableModelMesh'],
     requiredComponents: [StackComponent.MODEL_MESH],
@@ -121,6 +124,10 @@ export const SupportedAreasStateMap: SupportedAreasState = {
     featureFlags: ['disableDistributedWorkloads'],
     requiredComponents: [StackComponent.KUEUE],
   },
+  [SupportedArea.MODEL_CATALOG]: {
+    featureFlags: ['disableModelCatalog'],
+    reliantAreas: [SupportedArea.MODEL_REGISTRY],
+  },
   [SupportedArea.MODEL_REGISTRY]: {
     featureFlags: ['disableModelRegistry'],
     requiredComponents: [StackComponent.MODEL_REGISTRY],
@@ -137,5 +144,9 @@ export const SupportedAreasStateMap: SupportedAreasState = {
   [SupportedArea.NIM_MODEL]: {
     featureFlags: ['disableNIMModelServing'],
     reliantAreas: [SupportedArea.K_SERVE],
+  },
+  [SupportedArea.FINE_TUNING]: {
+    featureFlags: ['disableFineTuning'],
+    reliantAreas: [SupportedArea.DS_PIPELINES],
   },
 };

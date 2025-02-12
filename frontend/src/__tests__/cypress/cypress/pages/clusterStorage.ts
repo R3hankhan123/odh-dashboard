@@ -87,8 +87,15 @@ class ClusterStorageModal extends Modal {
       .findByTestId('cluster-storage-workbench-select');
   }
 
+  findWorkbenchName(row: number) {
+    return this.findWorkbenchTable()
+      .find(`[data-label=Name]`)
+      .eq(row)
+      .findByTestId('typeahead-menu-toggle');
+  }
+
   findWorkbenchSelectValueField(row: number) {
-    return this.findWorkbenchSelect(row).findByRole('combobox', {
+    return this.findWorkbenchName(row).findByRole('combobox', {
       name: 'Type to filter',
     });
   }
@@ -123,6 +130,10 @@ class ClusterStorageModal extends Modal {
 
   findSubmitButton() {
     return this.find().findByTestId('modal-submit-button');
+  }
+
+  findPVStorageSizeValue() {
+    return this.find().find('[aria-label="Input"]');
   }
 
   private findPVSizeSelectButton() {
@@ -233,6 +244,10 @@ class ClusterStorage {
 
   findCreateButtonFromActions() {
     return cy.findByTestId('actions-cluster-storage-button');
+  }
+
+  findKebabToggle() {
+    return cy.get('button[aria-label="Kebab toggle"]');
   }
 }
 

@@ -5,6 +5,9 @@ import type {
   ResourcesData,
   WBEditTestData,
   WBControlSuiteTestData,
+  WBVariablesTestData,
+  WBStatusTestData,
+  OOTBConnectionTypesData,
 } from '~/__tests__/cypress/cypress/types';
 
 // Load fixture function that returns DataScienceProjectData
@@ -42,6 +45,33 @@ export const loadWBControlSuiteFixture = (
 ): Cypress.Chainable<WBControlSuiteTestData> => {
   return cy.fixture(fixturePath, 'utf8').then((yamlContent: string) => {
     const data = yaml.load(yamlContent) as WBControlSuiteTestData;
+
+    return data;
+  });
+};
+export const loadWBVariablesFixture = (
+  fixturePath: string,
+): Cypress.Chainable<WBVariablesTestData> => {
+  return cy.fixture(fixturePath, 'utf8').then((yamlContent: string) => {
+    const data = yaml.load(yamlContent) as WBVariablesTestData;
+
+    return data;
+  });
+};
+
+export const loadWBStatusFixture = (fixturePath: string): Cypress.Chainable<WBStatusTestData> => {
+  return cy.fixture(fixturePath, 'utf8').then((yamlContent: string) => {
+    const data = yaml.load(yamlContent) as WBStatusTestData;
+
+    return data;
+  });
+};
+
+export const loadOOTBConnectionTypesFixture = (
+  fixturePath: string,
+): Cypress.Chainable<OOTBConnectionTypesData> => {
+  return cy.fixture(fixturePath, 'utf8').then((yamlContent: string) => {
+    const data = yaml.load(yamlContent) as OOTBConnectionTypesData;
 
     return data;
   });

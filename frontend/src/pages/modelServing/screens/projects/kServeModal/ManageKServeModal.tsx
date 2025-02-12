@@ -1,12 +1,11 @@
 import * as React from 'react';
-import { Alert, AlertActionCloseButton, Form, FormSection } from '@patternfly/react-core';
+import { Form, FormSection } from '@patternfly/react-core';
 import { Modal } from '@patternfly/react-core/deprecated';
 import { EitherOrNone } from '@openshift/dynamic-plugin-sdk';
 import {
   getCreateInferenceServiceLabels,
   getSubmitInferenceServiceResourceFn,
   getSubmitServingRuntimeResourcesFn,
-  isConnectionPathValid,
   useCreateInferenceServiceObject,
   useCreateServingRuntimeObject,
 } from '~/pages/modelServing/screens/projects/utils';
@@ -35,32 +34,30 @@ import ServingRuntimeSizeSection from '~/pages/modelServing/screens/projects/Ser
 import ServingRuntimeTemplateSection from '~/pages/modelServing/screens/projects/ServingRuntimeModal/ServingRuntimeTemplateSection';
 import ProjectSection from '~/pages/modelServing/screens/projects/InferenceServiceModal/ProjectSection';
 import { DataConnection, NamespaceApplicationCase } from '~/pages/projects/types';
-import { AwsKeys } from '~/pages/projects/dataConnections/const';
-import { isAWSValid } from '~/pages/projects/screens/spawner/spawnerUtils';
 import InferenceServiceFrameworkSection from '~/pages/modelServing/screens/projects/InferenceServiceModal/InferenceServiceFrameworkSection';
-import DataConnectionSection from '~/pages/modelServing/screens/projects/InferenceServiceModal/DataConnectionSection';
 import { getDisplayNameFromK8sResource } from '~/concepts/k8s/utils';
 import AuthServingRuntimeSection from '~/pages/modelServing/screens/projects/ServingRuntimeModal/AuthServingRuntimeSection';
 import { useAccessReview } from '~/api';
 import { SupportedArea, useIsAreaAvailable } from '~/concepts/areas';
 import { RegisteredModelDeployInfo } from '~/pages/modelRegistry/screens/RegisteredModels/useRegisteredModelDeployInfo';
-import usePrefillDeployModalFromModelRegistry from '~/pages/modelRegistry/screens/RegisteredModels/usePrefillDeployModalFromModelRegistry';
 import { fireFormTrackingEvent } from '~/concepts/analyticsTracking/segmentIOUtils';
 import {
   FormTrackingEventProperties,
   TrackingOutcome,
 } from '~/concepts/analyticsTracking/trackingProperties';
-import useConnectionTypesEnabled from '~/concepts/connectionTypes/useConnectionTypesEnabled';
 import { Connection } from '~/concepts/connectionTypes/types';
 import { ConnectionSection } from '~/pages/modelServing/screens/projects/InferenceServiceModal/ConnectionSection';
 import K8sNameDescriptionField, {
   useK8sNameDescriptionFieldData,
 } from '~/concepts/k8s/K8sNameDescriptionField/K8sNameDescriptionField';
 import { isK8sNameDescriptionDataValid } from '~/concepts/k8s/K8sNameDescriptionField/utils';
+import { validateEnvVarName } from '~/concepts/connectionTypes/utils';
+import { useKServeDeploymentMode } from '~/pages/modelServing/useKServeDeploymentMode';
 import KServeAutoscalerReplicaSection from './KServeAutoscalerReplicaSection';
 import EnvironmentVariablesSection from './EnvironmentVariablesSection';
 import ServingRuntimeArgsSection from './ServingRuntimeArgsSection';
 import { KServeDeploymentModeDropdown } from './KServeDeploymentModeDropdown';
+import { NoAuthAlert } from './NoAuthAlert';
 
 const accessReviewResource: AccessReviewResourceAttributes = {
   group: 'rbac.authorization.k8s.io',
@@ -99,6 +96,8 @@ const ManageKServeModal: React.FC<ManageKServeModalProps> = ({
   registeredModelDeployInfo,
   shouldFormHidden: hideForm,
 }) => {
+  const { isRawAvailable, isServerlessAvailable } = useKServeDeploymentMode();
+
   const [createDataServingRuntime, setCreateDataServingRuntime, , sizes] =
     useCreateServingRuntimeObject(editInfo?.servingRuntimeEditInfo);
   const [createDataInferenceService, setCreateDataInferenceService] =
@@ -110,23 +109,15 @@ const ManageKServeModal: React.FC<ManageKServeModalProps> = ({
   const { data: kServeNameDesc, onDataChange: setKserveNameDesc } = useK8sNameDescriptionFieldData({
     initialData: editInfo?.inferenceServiceEditInfo,
   });
-  const [dataConnections, dataConnectionsLoaded, dataConnectionsLoadError] =
-    usePrefillDeployModalFromModelRegistry(
-      projectContext,
-      createDataInferenceService,
-      setCreateDataInferenceService,
-      registeredModelDeployInfo,
-    );
 
-  const isConnectionTypesEnabled = useConnectionTypesEnabled();
   const [connection, setConnection] = React.useState<Connection>();
   const [isConnectionValid, setIsConnectionValid] = React.useState(false);
 
-  const isAuthorinoEnabled = useIsAreaAvailable(SupportedArea.K_SERVE_AUTH).status;
+  const isAuthAvailable =
+    useIsAreaAvailable(SupportedArea.K_SERVE_AUTH).status ||
+    createDataInferenceService.isKServeRawDeployment;
   const currentProjectName = projectContext?.currentProject.metadata.name;
   const namespace = currentProjectName || createDataInferenceService.project;
-
-  const isKServeRawEnabled = useIsAreaAvailable(SupportedArea.K_SERVE_RAW).status;
 
   const {
     initialState: initialAcceleratorProfileState,
@@ -180,23 +171,7 @@ const ManageKServeModal: React.FC<ManageKServeModalProps> = ({
     if (createDataInferenceService.storage.type === InferenceServiceStorageType.EXISTING_URI) {
       return !!createDataInferenceService.storage.uri;
     }
-    if (createDataInferenceService.storage.type === InferenceServiceStorageType.EXISTING_STORAGE) {
-      if (isConnectionTypesEnabled) {
-        return isConnectionValid;
-      }
-      return (
-        createDataInferenceService.storage.dataConnection !== '' &&
-        isConnectionPathValid(createDataInferenceService.storage.path)
-      );
-    }
-    // NEW_STORAGE
-    if (isConnectionTypesEnabled) {
-      return isConnectionValid;
-    }
-    return (
-      isAWSValid(createDataInferenceService.storage.awsData, [AwsKeys.AWS_S3_BUCKET]) &&
-      isConnectionPathValid(createDataInferenceService.storage.path)
-    );
+    return isConnectionValid;
   };
 
   const baseInputValueValid =
@@ -204,13 +179,15 @@ const ManageKServeModal: React.FC<ManageKServeModalProps> = ({
     resourcesArePositive(createDataInferenceService.modelSize.resources) &&
     requestsUnderLimits(createDataInferenceService.modelSize.resources);
 
-  const isDisabledInferenceService =
-    actionInProgress ||
+  const isDisabledInferenceService = () =>
     !isK8sNameDescriptionDataValid(kServeNameDesc) ||
     createDataInferenceService.project === '' ||
     createDataInferenceService.format.name === '' ||
     !storageCanCreate() ||
-    !baseInputValueValid;
+    !baseInputValueValid ||
+    createDataInferenceService.servingRuntimeEnvVars?.some(
+      (envVar) => !envVar.name || !!validateEnvVarName(envVar.name),
+    );
 
   const servingRuntimeSelected = React.useMemo(
     () =>
@@ -328,32 +305,15 @@ const ManageKServeModal: React.FC<ManageKServeModalProps> = ({
           submitLabel={editInfo ? 'Redeploy' : 'Deploy'}
           onSubmit={submit}
           onCancel={() => onBeforeClose(false)}
-          isSubmitDisabled={isDisabledServingRuntime || isDisabledInferenceService}
+          isSubmitDisabled={isDisabledServingRuntime || isDisabledInferenceService()}
           error={error}
           alertTitle="Error creating model server"
         />
       }
       showClose
     >
-      {!isAuthorinoEnabled && alertVisible && (
-        <Alert
-          id="no-authorino-installed-alert"
-          className="pf-v6-u-mb-md"
-          data-testid="no-authorino-installed-alert"
-          isExpandable
-          isInline
-          variant="warning"
-          title="Token authentication service not installed"
-          actionClose={<AlertActionCloseButton onClose={() => setAlertVisible(false)} />}
-        >
-          <p>
-            The single model serving platform used by this project allows deployed models to be
-            accessible via external routes. It is recommended that token authentication be enabled
-            to protect these routes. The serving platform requires the Authorino operator be
-            installed on the cluster for token authentication. Contact a cluster administrator to
-            install the operator.
-          </p>
-        </Alert>
+      {!isAuthAvailable && alertVisible && !isRawAvailable && (
+        <NoAuthAlert onClose={() => setAlertVisible(false)} />
       )}
       <Form
         onSubmit={(e) => {
@@ -405,7 +365,7 @@ const ManageKServeModal: React.FC<ManageKServeModalProps> = ({
                 modelContext={servingRuntimeSelected?.spec.supportedModelFormats}
                 registeredModelFormat={registeredModelDeployInfo?.modelFormat}
               />
-              {isKServeRawEnabled && (
+              {isRawAvailable && isServerlessAvailable && (
                 <KServeDeploymentModeDropdown
                   isRaw={!!createDataInferenceService.isKServeRawDeployment}
                   setIsRaw={(isRaw) =>
@@ -413,6 +373,9 @@ const ManageKServeModal: React.FC<ManageKServeModalProps> = ({
                   }
                   isDisabled={!!editInfo}
                 />
+              )}
+              {!isAuthAvailable && alertVisible && isRawAvailable && (
+                <NoAuthAlert onClose={() => setAlertVisible(false)} />
               )}
               <KServeAutoscalerReplicaSection
                 data={createDataInferenceService}
@@ -435,29 +398,19 @@ const ManageKServeModal: React.FC<ManageKServeModalProps> = ({
                 setData={setCreateDataInferenceService}
                 allowCreate={allowCreate}
                 publicRoute
-                showModelRoute={isAuthorinoEnabled}
+                showModelRoute={isAuthAvailable}
               />
             </>
           )}
         </FormSection>
         {!hideForm && (
           <FormSection title="Source model location" id="model-location">
-            {isConnectionTypesEnabled ? (
-              <ConnectionSection
-                data={createDataInferenceService}
-                setData={setCreateDataInferenceService}
-                setConnection={setConnection}
-                setIsConnectionValid={setIsConnectionValid}
-              />
-            ) : (
-              <DataConnectionSection
-                data={createDataInferenceService}
-                setData={setCreateDataInferenceService}
-                loaded={!!projectContext?.dataConnections || dataConnectionsLoaded}
-                loadError={dataConnectionsLoadError}
-                dataConnections={dataConnections}
-              />
-            )}
+            <ConnectionSection
+              data={createDataInferenceService}
+              setData={setCreateDataInferenceService}
+              setConnection={setConnection}
+              setIsConnectionValid={setIsConnectionValid}
+            />
           </FormSection>
         )}
         {servingRuntimeParamsEnabled && (

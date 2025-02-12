@@ -38,8 +38,8 @@ export enum SupportedArea {
   USER_MANAGEMENT = 'user-management',
   ACCELERATOR_PROFILES = 'accelerator-profiles',
   HARDWARE_PROFILES = 'hardware-profiles',
-  CONNECTION_TYPES = 'connections-types',
   STORAGE_CLASSES = 'storage-classes',
+  FINE_TUNING = 'fine-tuning',
 
   /* DS Projects specific areas */
   DS_PROJECTS_PERMISSIONS = 'ds-projects-permission',
@@ -52,6 +52,7 @@ export enum SupportedArea {
   K_SERVE_AUTH = 'kserve-auth',
   K_SERVE_METRICS = 'kserve-metrics',
   K_SERVE_RAW = 'kserve-raw',
+  K_SERVE_OCI = 'kserve-oci',
   MODEL_MESH = 'model-mesh',
   BIAS_METRICS = 'bias-metrics',
   PERFORMANCE_METRICS = 'performance-metrics',
@@ -65,6 +66,9 @@ export enum SupportedArea {
   /* Model Registry areas */
   MODEL_REGISTRY = 'model-registry',
   MODEL_REGISTRY_SECURE_DB = 'model-registry-secure-db',
+
+  /* Model catalog areas */
+  MODEL_CATALOG = 'model-catalog',
 }
 
 /** Components deployed by the Operator. Part of the DSC Status. */
